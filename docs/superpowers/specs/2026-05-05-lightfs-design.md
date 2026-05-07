@@ -296,7 +296,19 @@ When a Gateway routes a request to the new shard and the child meta server detec
 4. Once loaded, updates etcd: `status=ACTIVE`.
 5. Parent meta server observes the status change and can discard the transferred index entries.
 
-#### Independent Checkpoint After Split
+#### Shard Loading Race: Parent Splits Again
+
+A bucket shard may split again while a child is still loading. The parent does not block splits during child loading — new splits keep the hot path fast for writes.
+
+When a second split occurs on the same bucket:
+
+1. The parent splits itself again at a new midpoint, producing a **second child shard** with its own etcd entry (`status=SPLITTING`, `parent_shard_id` pointing to the original parent).
+2. The original loading child continues its loading from the parent's pre-split state. If it reaches a key range that was just split away, the parent's data for that range is still available — the parent retains ownership until the child goes `ACTIVE`.
+3. If the loading child needs entries that were already moved to the second child, it reads them from the parent's retained copy (the parent keeps the full pre-split range until all children reach `ACTIVE`).
+4. The second child follows the same loading protocol independently.
+5. Once a child reaches `ACTIVE`, the parent can discard the corresponding key range entries.
+
+This approach allows concurrent loading of multiple child shards from the same bucket split chain, with no serialization between split events.
 
 After a split completes, each shard maintains its own independent checkpoint:
 
