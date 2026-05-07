@@ -156,6 +156,25 @@ PutObject(bucket, key, data):
   7. [Async] Cross-DC bucket: enqueue replication to peer DC
 ```
 
+### Cross-DC Replication & Conflict Resolution
+
+#### Replication Flow
+
+- After local commit (step 6 in Write Path), the Gateway enqueues the object manifest and data fragments to a per-bucket replication queue.
+- A replication worker reads the queue, ships fragments to the peer DC's Gateway, which performs a local PutObject with the same bucket/key.
+- Replication is async — the peer DC may lag behind by seconds to minutes depending on network conditions.
+
+#### Conflict Resolution: Last Write Wins
+
+When the same object is written concurrently in two DCs (e.g., during a network partition), conflicts are resolved by **last write wins** using a monotonically increasing logical timestamp:
+
+1. **Timestamp**: every PutObject is assigned a `{DC_id, write_seq}` pair at the local Meta Server. `write_seq` is a per-meta-server monotonic counter.
+2. **Comparison**: on conflict, the peer DC compares timestamps lexicographically — higher `write_seq` wins; if equal, higher `DC_id` wins (deterministic tie-break).
+3. **Application**: the winning write overwrites the losing one in the Meta Server's B+tree. The losing write's data fragments become orphan blobs, reclaimed by GC.
+4. **No read-your-write guarantee across DCs**: a client writing to DC-A and immediately reading from DC-B may see stale data until replication converges.
+
+This approach requires no coordination between DCs, fits the async replication model, and keeps the write path fast during partition scenarios.
+
 ### Read Path
 
 ```
