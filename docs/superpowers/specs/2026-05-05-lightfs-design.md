@@ -252,9 +252,38 @@ Multiple meta servers, each owns a shard of the bucket index. In-memory CoW B+tr
 
 ### Sharding
 
-- Shard key: `hash(bucket_id) % num_shards → meta server`.
-- Large buckets can be further split by key prefix hash.
-- etcd: `/lightfs/meta/shards/{shard_id} → {owner, status, buckets[]}`
+#### Initial Placement
+
+- Each bucket is assigned to a single meta server at creation.
+- etcd: `/lightfs/meta/shards/{shard_id} → {owner, status, key_range}`
+- `key_range` = `[min_key, max_key]` — initially covers the full key space of the bucket.
+
+#### Shard Split
+
+When a bucket's index size exceeds a configured threshold, the owning meta server triggers a split:
+
+1. **Split point**: the midpoint of the B+tree key range, dividing the index into two contiguous key ranges.
+2. **Parent shard** retains the lower half `[min_key, split_key)`.
+3. **New shard** receives the upper half `[split_key, max_key]`, assigned to a new meta server.
+4. etcd records the new shard entry: `/lightfs/meta/shards/{new_shard_id} → {owner, status=SPLITTING, key_range, parent_shard_id}`.
+
+#### Shard Loading (Child Meta Server)
+
+When a Gateway routes a request to the new shard and the child meta server detects it has no in-memory data:
+
+1. Child meta server reads etcd, finds its `parent_shard_id`.
+2. Connects to the parent meta server and loads only the index entries within its `key_range`.
+3. Builds its own in-memory CoW B+tree from the received entries.
+4. Once loaded, updates etcd: `status=ACTIVE`.
+5. Parent meta server observes the status change and can discard the transferred index entries.
+
+#### Independent Checkpoint After Split
+
+After a split completes, each shard maintains its own independent checkpoint:
+
+- Separate Checkpoint Blob per shard.
+- Separate etcd checkpoint pointer: `/lightfs/meta/shards/{shard_id}/checkpoint`.
+- Recovery uses the per-shard checkpoint, not a shared one.
 
 ### Write Path (synchronous manifest push)
 
@@ -327,7 +356,7 @@ Will reference the existing `rpc/` framework (SPDK thread model, binary framing,
 | Replication mode | Per-bucket (2x/3x) | Gateway reads bucket config |
 | Storage tiers | Cluster-wide + per-disk | Storage Engine reads on startup |
 | Lifecycle rules | Per-bucket | Meta Server evaluates |
-| Meta shard map | Cluster-wide | Gateway + Access watch for routing |
+| Meta shard map | Per-shard (with parent→child relationship during split) | Gateway watches for shard key-range routing |
 
 ### Service Discovery
 
@@ -348,7 +377,7 @@ All components watch relevant etcd prefixes to build local routing tables. etcd 
 |-----------|-------------|-------|
 | PutObject | Strong (per-object) | All data blobs + Meta Server memory ack before 200 |
 | GetObject | Read-after-write | Immediate within same DC |
-| ListObjects | Eventually consistent | May lag by one checkpoint interval |
+| ListObjects | Strong | In-memory B+tree provides immediate consistency |
 | DeleteObject | Strong | Meta Server marks deleted in memory |
 | Cross-DC reads | Eventual | Async replication lag |
 
