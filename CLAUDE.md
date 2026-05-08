@@ -21,7 +21,7 @@ Client → Access Layer (HTTP/SigV4) → Gateway (EC/Placement/Routing) → Meta
 |--------|--------|----------|
 | Storage Engine (Phase 1) | **Implemented** | `src/storage/`, `include/lightfs/bs*.h` |
 | Access Layer (Phase 2) | **Implemented** | `src/access/`, `include/lightfs/access/` |
-| Meta Server (Phase 3) | Planned | `src/meta/`, `include/lightfs/meta/` |
+| Meta Server (Phase 3) | **Implemented** | `src/meta/`, `include/lightfs/meta/` |
 | etcd Management (Phase 4) | Planned | `src/cluster/`, `include/lightfs/cluster/` |
 | Gateway | Planned (not yet planned) | `src/gateway/`, `include/lightfs/gateway/` |
 | Network (RPC) | **Implemented** | `rpc/` (separate git repo) |
