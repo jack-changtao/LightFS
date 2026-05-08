@@ -19,8 +19,8 @@ Client → Access Layer (HTTP/SigV4) → Gateway (EC/Placement/Routing) → Meta
 
 | Module | Status | Location |
 |--------|--------|----------|
-| Storage Engine (Phase 1) | Planned | `src/storage/`, `include/lightfs/bs*.h` |
-| Access Layer (Phase 2) | Planned | `src/access/`, `include/lightfs/access/` |
+| Storage Engine (Phase 1) | **Implemented** | `src/storage/`, `include/lightfs/bs*.h` |
+| Access Layer (Phase 2) | **Implemented** | `src/access/`, `include/lightfs/access/` |
 | Meta Server (Phase 3) | Planned | `src/meta/`, `include/lightfs/meta/` |
 | etcd Management (Phase 4) | Planned | `src/cluster/`, `include/lightfs/cluster/` |
 | Gateway | Planned (not yet planned) | `src/gateway/`, `include/lightfs/gateway/` |
@@ -80,13 +80,14 @@ Phase order: Storage Engine → Access Layer → Meta Server → etcd Management
 
 ## Testing
 
-All tests use **Criterion** framework. Each module has its own `test/` directory with standalone test binaries.
+All tests use **assert()** for verification. Each module has its own `test/` directory with standalone test binaries.
 
 ```bash
-# Run single test binary
-cd test/storage && ./test_segment -v
+# Run all tests
+make test
 
-# Run all tests for a module
+# Run specific module tests
+cd test/access && make run
 cd test/storage && make run
 ```
 
