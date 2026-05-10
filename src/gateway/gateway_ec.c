@@ -121,7 +121,10 @@ int ec_decode(ec_engine_t *engine,
     for (int i = 0; i < k; i++) {
         int found = -1;
         for (int j = 0; j < fragment_count; j++) {
-            if (fragment_map[j] == i) { found = j; break; }
+            if (fragment_map[j] == i) {
+                found = j;
+                break;
+            }
         }
         if (found >= 0) {
             memcpy(data_out + i * frag_size, fragments[found], frag_size);

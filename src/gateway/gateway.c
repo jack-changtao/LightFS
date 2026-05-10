@@ -15,10 +15,17 @@ gateway_t *gateway_create(const gateway_config_t *cfg,
     gw->etcd = etcd;
 
     gw->placement = placement_engine_create(sd);
-    if (!gw->placement) { free(gw); return NULL; }
+    if (!gw->placement) {
+        free(gw);
+        return NULL;
+    }
 
     gw->router = fragment_router_create(sd);
-    if (!gw->router) { placement_engine_destroy(gw->placement); free(gw); return NULL; }
+    if (!gw->router) {
+        placement_engine_destroy(gw->placement);
+        free(gw);
+        return NULL;
+    }
 
     gw->cache = manifest_cache_create(cfg->manifest_cache_size > 0 ?
                                        cfg->manifest_cache_size :
