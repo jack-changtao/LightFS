@@ -20,9 +20,9 @@ int cow_btree_lookup(cow_btree_t *tree, btree_key_t key,
 
 int cow_btree_delete(cow_btree_t *tree, btree_key_t key);
 
-int cow_btree_serialize(cow_btree_t *tree, void *buf, int buf_size);
+int cow_btree_serialize(cow_btree_t *tree, void *buffer, int buffer_size);
 
-int cow_btree_deserialize(cow_btree_t *tree, const void *buf, int buf_size);
+int cow_btree_deserialize(cow_btree_t *tree, const void *buffer, int buffer_size);
 
 #ifdef __cplusplus
 }

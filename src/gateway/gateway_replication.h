@@ -8,7 +8,7 @@
 
 typedef struct {
     object_manifest_t manifest;
-    int pending;
+    int is_pending;
 } replication_entry_t;
 
 struct replication_engine {

@@ -6,14 +6,14 @@
 #include "lightfs/cluster/etcd_client.h"
 #include "mock_etcd.h"
 
-static int cb_called = 0;
-static char cb_last_key[1024] = {0};
+static int callback_called = 0;
+static char callback_last_key[1024] = {0};
 
-static void test_config_cb(const char *key, const char *new_value, void *ctx) {
-    cb_called++;
-    strncpy(cb_last_key, key, sizeof(cb_last_key) - 1);
+static void test_config_callback(const char *key, const char *new_value, void *user_data) {
+    callback_called++;
+    strncpy(callback_last_key, key, sizeof(callback_last_key) - 1);
     (void)new_value;
-    (void)ctx;
+    (void)user_data;
 }
 
 void test_create_and_get_ec_policy(void) {
@@ -24,16 +24,16 @@ void test_create_and_get_ec_policy(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_config_manager_t *mgr = cluster_config_create(client);
-    assert(mgr != NULL);
+    cluster_config_manager_t *manager = cluster_config_create(client);
+    assert(manager != NULL);
 
     ec_policy_config_t policy = {0};
-    int rc = cluster_config_get_ec_policy(mgr, &policy);
-    assert(rc == 0);
+    int result = cluster_config_get_ec_policy(manager, &policy);
+    assert(result== 0);
     assert(policy.default_data_k == 10);
     assert(policy.default_parity_m == 4);
 
-    cluster_config_destroy(mgr);
+    cluster_config_destroy(manager);
     etcd_client_destroy(client);
     printf("create_and_get_ec_policy test PASSED\n");
 }
@@ -46,14 +46,14 @@ void test_get_nonexistent_bucket(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_config_manager_t *mgr = cluster_config_create(client);
-    assert(mgr != NULL);
+    cluster_config_manager_t *manager = cluster_config_create(client);
+    assert(manager != NULL);
 
-    bucket_config_t cfg = {0};
-    int rc = cluster_config_get_bucket(mgr, "no-such-bucket", &cfg);
-    assert(rc != 0);
+    bucket_config_t config = {0};
+    int result = cluster_config_get_bucket(manager, "no-such-bucket", &config);
+    assert(result!= 0);
 
-    cluster_config_destroy(mgr);
+    cluster_config_destroy(manager);
     etcd_client_destroy(client);
     printf("get_nonexistent_bucket test PASSED\n");
 }
@@ -66,14 +66,14 @@ void test_watch_config_changes(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_config_manager_t *mgr = cluster_config_create(client);
-    assert(mgr != NULL);
+    cluster_config_manager_t *manager = cluster_config_create(client);
+    assert(manager != NULL);
 
-    cb_called = 0;
-    int rc = cluster_config_watch(mgr, test_config_cb, NULL);
-    assert(rc == 0);
+    callback_called = 0;
+    int result = cluster_config_watch(manager, test_config_callback, NULL);
+    assert(result== 0);
 
-    cluster_config_destroy(mgr);
+    cluster_config_destroy(manager);
     etcd_client_destroy(client);
     printf("watch_config_changes test PASSED\n");
 }

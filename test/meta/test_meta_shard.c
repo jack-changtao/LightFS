@@ -5,15 +5,15 @@
 #include "lightfs/meta/meta_shard.h"
 #include "lightfs/meta/meta_types.h"
 
-static void fill_manifest(object_manifest_t *m,
+static void fill_manifest(object_manifest_t *manifest,
                           const char *bucket, const char *key,
                           uint64_t seq) {
-    memset(m, 0, sizeof(*m));
-    strncpy(m->bucket, bucket, sizeof(m->bucket) - 1);
-    strncpy(m->key, key, sizeof(m->key) - 1);
-    m->size = 1024;
-    m->crc = 0xABCD;
-    m->write_seq = seq;
+    memset(manifest, 0, sizeof(*manifest));
+    strncpy(manifest->bucket, bucket, sizeof(manifest->bucket) - 1);
+    strncpy(manifest->key, key, sizeof(manifest->key) - 1);
+    manifest->size = 1024;
+    manifest->checksum = 0xABCD;
+    manifest->write_sequence = seq;
 }
 
 void test_insert_and_lookup(void) {
@@ -22,16 +22,16 @@ void test_insert_and_lookup(void) {
     meta_shard_t *shard = meta_shard_create(1, 0, "testbucket");
     assert(shard != NULL);
 
-    object_manifest_t m;
-    fill_manifest(&m, "testbucket", "file.txt", 1);
-    int rc = meta_shard_insert(shard, &m);
-    assert(rc == 0);
+    object_manifest_t manifest;
+    fill_manifest(&manifest, "testbucket", "file.txt", 1);
+    int result = meta_shard_insert(shard, &manifest);
+    assert(result== 0);
 
     object_manifest_t found = {0};
-    rc = meta_shard_lookup(shard, "testbucket", "file.txt", &found);
-    assert(rc == 0);
+    result =meta_shard_lookup(shard, "testbucket", "file.txt", &found);
+    assert(result== 0);
     assert(found.size == 1024);
-    assert(found.write_seq == 1);
+    assert(found.write_sequence == 1);
 
     meta_shard_destroy(shard);
     printf("insert_and_lookup test PASSED\n");
@@ -46,17 +46,17 @@ void test_bulk_insert_and_list(void) {
     for (int i = 0; i < 50; i++) {
         char key[32];
         snprintf(key, sizeof(key), "file%03d.txt", i);
-        object_manifest_t m;
-        fill_manifest(&m, "testbucket", key, (uint64_t)i + 1);
-        meta_shard_insert(shard, &m);
+        object_manifest_t manifest;
+        fill_manifest(&manifest, "testbucket", key, (uint64_t)i + 1);
+        meta_shard_insert(shard, &manifest);
     }
 
     char *keys[100];
     for (int i = 0; i < 100; i++) keys[i] = calloc(1, 64);
     int count = 0;
 
-    int rc = meta_shard_list(shard, "testbucket", "file0", "", 10, keys, &count);
-    assert(rc == 0);
+    int result = meta_shard_list(shard, "testbucket", "file0", "", 10, keys, &count);
+    assert(result== 0);
     assert(count == 10);
     assert(strcmp(keys[0], "file000.txt") == 0);
 
@@ -74,9 +74,9 @@ void test_split_blocks_loading_child(void) {
     for (int i = 0; i < 10; i++) {
         char key[32];
         snprintf(key, sizeof(key), "key%02d", i);
-        object_manifest_t m;
-        fill_manifest(&m, "testbucket", key, (uint64_t)i + 1);
-        meta_shard_insert(shard, &m);
+        object_manifest_t manifest;
+        fill_manifest(&manifest, "testbucket", key, (uint64_t)i + 1);
+        meta_shard_insert(shard, &manifest);
     }
 
     meta_shard_t *child = meta_shard_split(shard, 2);
@@ -101,16 +101,16 @@ void test_delete_and_verify_missing(void) {
     meta_shard_t *shard = meta_shard_create(1, 0, "testbucket");
     assert(shard != NULL);
 
-    object_manifest_t m;
-    fill_manifest(&m, "testbucket", "delete-me.txt", 1);
-    meta_shard_insert(shard, &m);
+    object_manifest_t manifest;
+    fill_manifest(&manifest, "testbucket", "delete-me.txt", 1);
+    meta_shard_insert(shard, &manifest);
 
-    int rc = meta_shard_delete(shard, "testbucket", "delete-me.txt");
-    assert(rc == 0);
+    int result = meta_shard_delete(shard, "testbucket", "delete-me.txt");
+    assert(result== 0);
 
     object_manifest_t found = {0};
-    rc = meta_shard_lookup(shard, "testbucket", "delete-me.txt", &found);
-    assert(rc == -1);
+    result =meta_shard_lookup(shard, "testbucket", "delete-me.txt", &found);
+    assert(result== -1);
 
     meta_shard_destroy(shard);
     printf("delete_and_verify_missing test PASSED\n");

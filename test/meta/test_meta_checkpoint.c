@@ -14,32 +14,32 @@ void test_serialize_and_deserialize(void) {
     for (int i = 0; i < 20; i++) {
         char key[32];
         snprintf(key, sizeof(key), "obj%03d", i);
-        object_manifest_t m;
-        memset(&m, 0, sizeof(m));
-        strncpy(m.bucket, "testbucket", sizeof(m.bucket) - 1);
-        strncpy(m.key, key, sizeof(m.key) - 1);
-        m.size = (uint64_t)(i * 100);
-        m.crc = (uint32_t)i;
-        m.write_seq = (uint64_t)(i + 1);
-        meta_shard_insert(shard, &m);
+        object_manifest_t manifest;
+        memset(&manifest, 0, sizeof(manifest));
+        strncpy(manifest.bucket, "testbucket", sizeof(manifest.bucket) - 1);
+        strncpy(manifest.key, key, sizeof(manifest.key) - 1);
+        manifest.size = (uint64_t)(i * 100);
+        manifest.checksum = (uint32_t)i;
+        manifest.write_sequence = (uint64_t)(i + 1);
+        meta_shard_insert(shard, &manifest);
     }
 
     uint64_t checkpoint_id = 0;
-    int n = meta_checkpoint_write(shard, 1, &checkpoint_id);
-    assert(n > 0);
+    int written = meta_checkpoint_write(shard, 1, &checkpoint_id);
+    assert(written > 0);
 
     meta_shard_t *shard2 = meta_shard_create(1, 0, "testbucket");
     assert(shard2 != NULL);
 
-    int rc = meta_checkpoint_read(shard2, checkpoint_id);
-    assert(rc == 0);
+    int result = meta_checkpoint_read(shard2, checkpoint_id);
+    assert(result== 0);
 
     for (int i = 0; i < 20; i++) {
         char key[32];
         snprintf(key, sizeof(key), "obj%03d", i);
         object_manifest_t found = {0};
-        rc = meta_shard_lookup(shard2, "testbucket", key, &found);
-        assert(rc == 0);
+        result =meta_shard_lookup(shard2, "testbucket", key, &found);
+        assert(result== 0);
         assert(found.size == (uint64_t)(i * 100));
     }
 

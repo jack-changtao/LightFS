@@ -8,57 +8,57 @@
 
 typedef struct checkpoint_header {
     uint64_t magic;
-    uint64_t seq;
+    uint64_t sequence;
     uint64_t shard_id;
     uint32_t entry_count;
     uint32_t reserved;
 } checkpoint_header_t;
 
-static char g_checkpoint_buf[1024 * 1024];
+static char g_checkpoint_buffer[1024 * 1024];
 static uint64_t g_checkpoint_id_counter = 0;
 
 int meta_checkpoint_write(meta_shard_t *shard,
-                           uint64_t seq,
+                           uint64_t sequence,
                            uint64_t *checkpoint_blob_id_out) {
     if (!shard || !checkpoint_blob_id_out) return -1;
 
-    checkpoint_header_t *hdr = (checkpoint_header_t *)g_checkpoint_buf;
-    hdr->magic = CHECKPOINT_HEADER_MAGIC;
-    hdr->seq = seq;
-    hdr->shard_id = meta_shard_get_id(shard);
-    hdr->entry_count = (uint32_t)meta_shard_get_count(shard);
-    hdr->reserved = 0;
+    checkpoint_header_t *header = (checkpoint_header_t *)g_checkpoint_buffer;
+    header->magic = CHECKPOINT_HEADER_MAGIC;
+    header->sequence = sequence;
+    header->shard_id = meta_shard_get_id(shard);
+    header->entry_count = (uint32_t)meta_shard_get_count(shard);
+    header->reserved = 0;
 
-    char *p = g_checkpoint_buf + sizeof(checkpoint_header_t);
+    char *cursor = g_checkpoint_buffer + sizeof(checkpoint_header_t);
     int entry_count = meta_shard_get_count(shard);
     object_manifest_t *entries = meta_shard_get_entries(shard);
 
     for (int i = 0; i < entry_count; i++) {
-        object_manifest_t *m = &entries[i];
+        object_manifest_t *manifest = &entries[i];
 
-        int blen = (int)strlen(m->bucket) + 1;
-        memcpy(p, m->bucket, blen);
-        p += blen;
+        int bucket_name_length = (int)strlen(manifest->bucket) + 1;
+        memcpy(cursor, manifest->bucket, bucket_name_length);
+        cursor += bucket_name_length;
 
-        int klen = (int)strlen(m->key) + 1;
-        memcpy(p, m->key, klen);
-        p += klen;
+        int key_length = (int)strlen(manifest->key) + 1;
+        memcpy(cursor, manifest->key, key_length);
+        cursor += key_length;
 
-        memcpy(p, &m->size, sizeof(m->size));
-        p += sizeof(m->size);
-        memcpy(p, &m->crc, sizeof(m->crc));
-        p += sizeof(m->crc);
-        memcpy(p, &m->write_seq, sizeof(m->write_seq));
-        p += sizeof(m->write_seq);
-        memcpy(p, &m->dc_id, sizeof(m->dc_id));
-        p += sizeof(m->dc_id);
+        memcpy(cursor, &manifest->size, sizeof(manifest->size));
+        cursor += sizeof(manifest->size);
+        memcpy(cursor, &manifest->checksum, sizeof(manifest->checksum));
+        cursor += sizeof(manifest->checksum);
+        memcpy(cursor, &manifest->write_sequence, sizeof(manifest->write_sequence));
+        cursor += sizeof(manifest->write_sequence);
+        memcpy(cursor, &manifest->datacenter_id, sizeof(manifest->datacenter_id));
+        cursor += sizeof(manifest->datacenter_id);
     }
 
-    int total_len = (int)(p - g_checkpoint_buf);
+    int total_length = (int)(cursor - g_checkpoint_buffer);
     g_checkpoint_id_counter++;
     *checkpoint_blob_id_out = g_checkpoint_id_counter;
 
-    return total_len;
+    return total_length;
 }
 
 int meta_checkpoint_read(meta_shard_t *shard,
@@ -67,33 +67,33 @@ int meta_checkpoint_read(meta_shard_t *shard,
 
     if (!shard) return -1;
 
-    checkpoint_header_t *hdr = (checkpoint_header_t *)g_checkpoint_buf;
-    if (hdr->magic != CHECKPOINT_HEADER_MAGIC) return -1;
+    checkpoint_header_t *header = (checkpoint_header_t *)g_checkpoint_buffer;
+    if (header->magic != CHECKPOINT_HEADER_MAGIC) return -1;
 
-    char *p = g_checkpoint_buf + sizeof(checkpoint_header_t);
+    char *cursor = g_checkpoint_buffer + sizeof(checkpoint_header_t);
 
-    for (uint32_t i = 0; i < hdr->entry_count; i++) {
-        object_manifest_t m;
-        memset(&m, 0, sizeof(m));
+    for (uint32_t i = 0; i < header->entry_count; i++) {
+        object_manifest_t manifest;
+        memset(&manifest, 0, sizeof(manifest));
 
-        int blen = (int)strlen(p) + 1;
-        strncpy(m.bucket, p, sizeof(m.bucket) - 1);
-        p += blen;
+        int bucket_name_length = (int)strlen(cursor) + 1;
+        strncpy(manifest.bucket, cursor, sizeof(manifest.bucket) - 1);
+        cursor += bucket_name_length;
 
-        int klen = (int)strlen(p) + 1;
-        strncpy(m.key, p, sizeof(m.key) - 1);
-        p += klen;
+        int key_length = (int)strlen(cursor) + 1;
+        strncpy(manifest.key, cursor, sizeof(manifest.key) - 1);
+        cursor += key_length;
 
-        memcpy(&m.size, p, sizeof(m.size));
-        p += sizeof(m.size);
-        memcpy(&m.crc, p, sizeof(m.crc));
-        p += sizeof(m.crc);
-        memcpy(&m.write_seq, p, sizeof(m.write_seq));
-        p += sizeof(m.write_seq);
-        memcpy(&m.dc_id, p, sizeof(m.dc_id));
-        p += sizeof(m.dc_id);
+        memcpy(&manifest.size, cursor, sizeof(manifest.size));
+        cursor += sizeof(manifest.size);
+        memcpy(&manifest.checksum, cursor, sizeof(manifest.checksum));
+        cursor += sizeof(manifest.checksum);
+        memcpy(&manifest.write_sequence, cursor, sizeof(manifest.write_sequence));
+        cursor += sizeof(manifest.write_sequence);
+        memcpy(&manifest.datacenter_id, cursor, sizeof(manifest.datacenter_id));
+        cursor += sizeof(manifest.datacenter_id);
 
-        meta_shard_insert(shard, &m);
+        meta_shard_insert(shard, &manifest);
     }
 
     return 0;

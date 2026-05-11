@@ -7,7 +7,7 @@
 
 typedef struct fragment_router fragment_router_t;
 
-fragment_router_t *fragment_router_create(service_discovery_t *sd);
+fragment_router_t *fragment_router_create(service_discovery_t *discovery);
 void fragment_router_destroy(fragment_router_t *router);
 
 int fragment_router_send(fragment_router_t *router,

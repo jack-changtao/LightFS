@@ -5,14 +5,14 @@
 #include <stdint.h>
 
 typedef struct {
-    segment_manager_t *mgr;
+    segment_manager_t *manager;
     uint32_t threshold;
     uint64_t last_run;
-} gc_context_t;
+} garbage_collection_context_t;
 
-int gc_init(gc_context_t *ctx, segment_manager_t *mgr);
-void gc_destroy(gc_context_t *ctx);
-int gc_should_run(gc_context_t *ctx);
-int gc_run(gc_context_t *ctx);
+int garbage_collection_initialize(garbage_collection_context_t *context, segment_manager_t *manager);
+void garbage_collection_destroy(garbage_collection_context_t *context);
+int garbage_collection_should_run(garbage_collection_context_t *context);
+int garbage_collection_run(garbage_collection_context_t *context);
 
 #endif /* LIGHTFS_GC_H */

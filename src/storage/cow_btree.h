@@ -17,7 +17,7 @@ typedef struct btree_node {
 struct cow_btree {
     btree_node_t *root;
     uint64_t next_page_id;
-    int dirty;
+    int is_dirty;
 };
 
 #endif /* LIGHTFS_COW_BTREE_INTERNAL_H */

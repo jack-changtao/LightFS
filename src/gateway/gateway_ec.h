@@ -3,9 +3,9 @@
 
 #include "lightfs/gateway/gateway_ec.h"
 
-struct ec_engine {
-    int k;
-    int m;
+struct erasure_coding_engine {
+    int data_fragment_count;
+    int parity_fragment_count;
     uint8_t *encode_matrix;
 };
 

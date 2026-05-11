@@ -25,21 +25,21 @@ int replication_enqueue(replication_engine_t *engine,
     if (engine->peer_count == 0) return -1;
     if (engine->queue_count >= REPLICATION_QUEUE_MAX) return -1;
 
-    replication_entry_t *e = &engine->queue[engine->queue_count++];
-    e->manifest = *manifest;
-    e->pending = 1;
+    replication_entry_t *entry = &engine->queue[engine->queue_count++];
+    entry->manifest = *manifest;
+    entry->is_pending = 1;
     (void)data;
     (void)size;
     return 0;
 }
 
-int replication_resolve_conflict(uint64_t incoming_write_seq,
-                                  uint32_t incoming_dc_id,
-                                  uint64_t existing_write_seq,
-                                  uint32_t existing_dc_id) {
-    if (incoming_write_seq > existing_write_seq) return 1;
-    if (incoming_write_seq < existing_write_seq) return 0;
-    if (incoming_dc_id > existing_dc_id) return 1;
+int replication_resolve_conflict(uint64_t incoming_write_sequence,
+                                  uint32_t incoming_datacenter_id,
+                                  uint64_t existing_write_sequence,
+                                  uint32_t existing_datacenter_id) {
+    if (incoming_write_sequence > existing_write_sequence) return 1;
+    if (incoming_write_sequence < existing_write_sequence) return 0;
+    if (incoming_datacenter_id > existing_datacenter_id) return 1;
     return 0;
 }
 

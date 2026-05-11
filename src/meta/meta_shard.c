@@ -8,9 +8,9 @@ struct meta_shard {
     uint32_t shard_id;
     uint32_t parent_shard_id;
     cow_btree_t *btree;
-    char bucket_name[META_MAX_BUCKET_LEN + 1];
-    char key_min[META_MAX_KEY_LEN + 1];
-    char key_max[META_MAX_KEY_LEN + 1];
+    char bucket_name[META_MAX_BUCKET_LENGTH + 1];
+    char key_min[META_MAX_KEY_LENGTH + 1];
+    char key_max[META_MAX_KEY_LENGTH + 1];
     int has_loading_child;
     object_manifest_t *entries;
     int entry_count;
@@ -68,14 +68,14 @@ static int find_entry(meta_shard_t *shard, const char *bucket, const char *key) 
 int meta_shard_insert(meta_shard_t *shard, const object_manifest_t *manifest) {
     if (!shard || !manifest) return -1;
 
-    int idx = find_entry(shard, manifest->bucket, manifest->key);
-    if (idx >= 0) {
-        shard->entries[idx] = *manifest;
+    int index = find_entry(shard, manifest->bucket, manifest->key);
+    if (index >= 0) {
+        shard->entries[index] = *manifest;
         if (manifest->fragments && manifest->fragment_count > 0) {
-            shard->entries[idx].fragments = malloc(
+            shard->entries[index].fragments = malloc(
                 manifest->fragment_count * sizeof(blob_location_t));
-            if (shard->entries[idx].fragments) {
-                memcpy(shard->entries[idx].fragments, manifest->fragments,
+            if (shard->entries[index].fragments) {
+                memcpy(shard->entries[index].fragments, manifest->fragments,
                        manifest->fragment_count * sizeof(blob_location_t));
             }
         }
@@ -83,12 +83,12 @@ int meta_shard_insert(meta_shard_t *shard, const object_manifest_t *manifest) {
     }
 
     if (shard->entry_count >= shard->entry_capacity) {
-        int new_cap = shard->entry_capacity * 2;
+        int new_capacity = shard->entry_capacity * 2;
         object_manifest_t *new_entries = realloc(shard->entries,
-                                                  new_cap * sizeof(object_manifest_t));
+                                                  new_capacity * sizeof(object_manifest_t));
         if (!new_entries) return -1;
         shard->entries = new_entries;
-        shard->entry_capacity = new_cap;
+        shard->entry_capacity = new_capacity;
     }
 
     shard->entries[shard->entry_count++] = *manifest;
@@ -108,13 +108,13 @@ int meta_shard_insert(meta_shard_t *shard, const object_manifest_t *manifest) {
 
 int meta_shard_lookup(meta_shard_t *shard,
                        const char *bucket, const char *key,
-                       object_manifest_t *out) {
-    if (!shard || !bucket || !key || !out) return -1;
+                       object_manifest_t *manifest_out) {
+    if (!shard || !bucket || !key || !manifest_out) return -1;
 
-    int idx = find_entry(shard, bucket, key);
-    if (idx < 0) return -1;
+    int index = find_entry(shard, bucket, key);
+    if (index < 0) return -1;
 
-    *out = shard->entries[idx];
+    *manifest_out = shard->entries[index];
     return 0;
 }
 
@@ -122,14 +122,14 @@ int meta_shard_delete(meta_shard_t *shard,
                        const char *bucket, const char *key) {
     if (!shard || !bucket || !key) return -1;
 
-    int idx = find_entry(shard, bucket, key);
-    if (idx < 0) return -1;
+    int index = find_entry(shard, bucket, key);
+    if (index < 0) return -1;
 
-    if (shard->entries[idx].fragments) {
-        free(shard->entries[idx].fragments);
+    if (shard->entries[index].fragments) {
+        free(shard->entries[index].fragments);
     }
 
-    for (int i = idx; i < shard->entry_count - 1; i++) {
+    for (int i = index; i < shard->entry_count - 1; i++) {
         shard->entries[i] = shard->entries[i + 1];
     }
     shard->entry_count--;
@@ -145,7 +145,7 @@ int meta_shard_list(meta_shard_t *shard,
                      int *count_out) {
     if (!shard || !bucket || !keys_out || !count_out) return -1;
 
-    int prefix_len = prefix ? (int)strlen(prefix) : 0;
+    int prefix_length = prefix ? (int)strlen(prefix) : 0;
     int start = 0;
 
     if (marker && marker[0]) {
@@ -161,8 +161,8 @@ int meta_shard_list(meta_shard_t *shard,
     for (int i = start; i < shard->entry_count && count < max_keys; i++) {
         if (strcmp(shard->entries[i].bucket, bucket) != 0) continue;
 
-        if (prefix_len > 0 &&
-            strncmp(shard->entries[i].key, prefix, prefix_len) != 0) continue;
+        if (prefix_length > 0 &&
+            strncmp(shard->entries[i].key, prefix, prefix_length) != 0) continue;
 
         strncpy(keys_out[count], shard->entries[i].key, 63);
         keys_out[count][63] = '\0';
@@ -180,8 +180,8 @@ int meta_shard_count(meta_shard_t *shard) {
 meta_shard_t *meta_shard_split(meta_shard_t *shard, uint32_t new_shard_id) {
     if (!shard || shard->has_loading_child) return NULL;
 
-    int mid = shard->entry_count / 2;
-    if (mid <= 0) return NULL;
+    int midpoint = shard->entry_count / 2;
+    if (midpoint <= 0) return NULL;
 
     meta_shard_t *child = meta_shard_create(new_shard_id, shard->shard_id,
                                              shard->bucket_name);

@@ -15,23 +15,23 @@ void test_gateway_create_destroy(void) {
     mock_etcd_init();
     etcd_client_t *etcd = etcd_client_create("127.0.0.1", 2379);
     assert(etcd != NULL);
-    service_discovery_t *sd = service_discovery_create(etcd);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(etcd);
+    assert(discovery != NULL);
 
-    gateway_config_t cfg = {
+    gateway_config_t config = {
         .node_id = 1,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .gateway_port = 8080,
-        .default_ec_policy = EC_6_PLUS_3,
+        .default_ec_policy = ERASURE_CODING_6_PLUS_3,
         .default_replication_factor = 2,
         .manifest_cache_size = 1000,
     };
 
-    gateway_t *gw = gateway_create(&cfg, sd, etcd);
-    assert(gw != NULL);
+    gateway_t *gateway = gateway_create(&config, discovery, etcd);
+    assert(gateway != NULL);
 
-    gateway_destroy(gw);
-    service_discovery_destroy(sd);
+    gateway_destroy(gateway);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(etcd);
     printf("gateway_create_destroy test PASSED\n");
 }
@@ -42,48 +42,48 @@ void test_gateway_put_get_small_object(void) {
     mock_etcd_init();
     etcd_client_t *etcd = etcd_client_create("127.0.0.1", 2379);
     assert(etcd != NULL);
-    service_discovery_t *sd = service_discovery_create(etcd);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(etcd);
+    assert(discovery != NULL);
 
-    gateway_config_t cfg = {
+    gateway_config_t config = {
         .node_id = 1,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .gateway_port = 8080,
-        .default_ec_policy = EC_REPLICATION_2X,
+        .default_ec_policy = ERASURE_CODING_REPLICATION_2X,
         .default_replication_factor = 2,
         .manifest_cache_size = 100,
     };
 
-    gateway_t *gw = gateway_create(&cfg, sd, etcd);
-    assert(gw != NULL);
+    gateway_t *gateway = gateway_create(&config, discovery, etcd);
+    assert(gateway != NULL);
 
     /* Register nodes for placement */
-    struct placement_engine *pe = gateway_get_placement(gw);
-    placement_register_node(pe, 1, 0, 0, 1, 1024ULL*1024*1024*1024);
-    placement_register_node(pe, 2, 0, 0, 2, 1024ULL*1024*1024*1024);
+    struct placement_engine *engine = gateway_get_placement(gateway);
+    placement_register_node(engine, 1, 0, 0, 1, 1024ULL*1024*1024*1024);
+    placement_register_node(engine, 2, 0, 0, 2, 1024ULL*1024*1024*1024);
 
     char data[512];
     for (int i = 0; i < 512; i++) data[i] = (char)(i & 0xFF);
 
-    gateway_put_request_t req;
-    memset(&req, 0, sizeof(req));
-    strncpy(req.bucket, "testbucket", sizeof(req.bucket) - 1);
-    strncpy(req.key, "hello.txt", sizeof(req.key) - 1);
-    req.data = (uint8_t *)data;
-    req.size = 512;
-    req.ec_override = 0;
+    gateway_put_request_t request;
+    memset(&request, 0, sizeof(request));
+    strncpy(request.bucket, "testbucket", sizeof(request.bucket) - 1);
+    strncpy(request.key, "hello.txt", sizeof(request.key) - 1);
+    request.data = (uint8_t *)data;
+    request.size = 512;
+    request.has_erasure_coding_override = 0;
 
-    int rc = gateway_put_object(gw, &req);
-    assert(rc == 0);
+    int result = gateway_put_object(gateway, &request);
+    assert(result == 0);
 
-    gateway_get_response_t resp = {0};
-    rc = gateway_get_object(gw, "testbucket", "hello.txt", &resp);
-    assert(rc == 0);
-    assert(resp.size == 512);
+    gateway_get_response_t response = {0};
+    result =gateway_get_object(gateway, "testbucket", "hello.txt", &response);
+    assert(result == 0);
+    assert(response.size == 512);
 
-    free(resp.data);
-    gateway_destroy(gw);
-    service_discovery_destroy(sd);
+    free(response.data);
+    gateway_destroy(gateway);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(etcd);
     printf("gateway_put_get_small_object test PASSED\n");
 }
@@ -94,49 +94,49 @@ void test_gateway_delete_object(void) {
     mock_etcd_init();
     etcd_client_t *etcd = etcd_client_create("127.0.0.1", 2379);
     assert(etcd != NULL);
-    service_discovery_t *sd = service_discovery_create(etcd);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(etcd);
+    assert(discovery != NULL);
 
-    gateway_config_t cfg = {
+    gateway_config_t config = {
         .node_id = 1,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .gateway_port = 8080,
-        .default_ec_policy = EC_REPLICATION_2X,
+        .default_ec_policy = ERASURE_CODING_REPLICATION_2X,
         .default_replication_factor = 2,
         .manifest_cache_size = 100,
     };
 
-    gateway_t *gw = gateway_create(&cfg, sd, etcd);
-    assert(gw != NULL);
+    gateway_t *gateway = gateway_create(&config, discovery, etcd);
+    assert(gateway != NULL);
 
-    struct placement_engine *pe = gateway_get_placement(gw);
-    placement_register_node(pe, 1, 0, 0, 1, 1024ULL*1024*1024*1024);
-    placement_register_node(pe, 2, 0, 0, 2, 1024ULL*1024*1024*1024);
+    struct placement_engine *engine = gateway_get_placement(gateway);
+    placement_register_node(engine, 1, 0, 0, 1, 1024ULL*1024*1024*1024);
+    placement_register_node(engine, 2, 0, 0, 2, 1024ULL*1024*1024*1024);
 
     char data[64];
     memset(data, 0x42, 64);
 
-    gateway_put_request_t req;
-    memset(&req, 0, sizeof(req));
-    strncpy(req.bucket, "testbucket", sizeof(req.bucket) - 1);
-    strncpy(req.key, "todelete.txt", sizeof(req.key) - 1);
-    req.data = (uint8_t *)data;
-    req.size = 64;
-    req.ec_override = 0;
+    gateway_put_request_t request;
+    memset(&request, 0, sizeof(request));
+    strncpy(request.bucket, "testbucket", sizeof(request.bucket) - 1);
+    strncpy(request.key, "todelete.txt", sizeof(request.key) - 1);
+    request.data = (uint8_t *)data;
+    request.size = 64;
+    request.has_erasure_coding_override = 0;
 
-    int rc = gateway_put_object(gw, &req);
-    assert(rc == 0);
+    int result = gateway_put_object(gateway, &request);
+    assert(result == 0);
 
-    rc = gateway_delete_object(gw, "testbucket", "todelete.txt");
-    assert(rc == 0);
+    result =gateway_delete_object(gateway, "testbucket", "todelete.txt");
+    assert(result == 0);
 
-    gateway_get_response_t resp = {0};
-    rc = gateway_get_object(gw, "testbucket", "todelete.txt", &resp);
-    assert(rc != 0);
+    gateway_get_response_t response = {0};
+    result =gateway_get_object(gateway, "testbucket", "todelete.txt", &response);
+    assert(result != 0);
 
-    free(resp.data);
-    gateway_destroy(gw);
-    service_discovery_destroy(sd);
+    free(response.data);
+    gateway_destroy(gateway);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(etcd);
     printf("gateway_delete_object test PASSED\n");
 }

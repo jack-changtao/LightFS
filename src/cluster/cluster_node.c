@@ -11,21 +11,21 @@ struct cluster_node {
 };
 
 cluster_node_t *cluster_node_join(etcd_client_t *client,
-                                   const cluster_node_config_t *cfg) {
-    if (!client || !cfg) return NULL;
+                                   const cluster_node_config_t *config) {
+    if (!client || !config) return NULL;
 
     cluster_node_t *node = calloc(1, sizeof(cluster_node_t));
     if (!node) return NULL;
 
     node->client = client;
-    node->info.node_id = cfg->node_id;
-    node->info.dc_id = cfg->dc_id;
-    strncpy(node->info.host, cfg->host, sizeof(node->info.host) - 1);
-    node->info.gateway_port = cfg->gateway_port;
-    node->info.meta_port = cfg->meta_port;
-    node->info.access_port = cfg->access_port;
-    node->info.disk_count = cfg->disk_count;
-    node->info.total_disk_bytes = cfg->total_disk_bytes;
+    node->info.node_id = config->node_id;
+    node->info.datacenter_id = config->datacenter_id;
+    strncpy(node->info.host, config->host, sizeof(node->info.host) - 1);
+    node->info.gateway_port = config->gateway_port;
+    node->info.meta_port = config->meta_port;
+    node->info.access_port = config->access_port;
+    node->info.disk_count = config->disk_count;
+    node->info.total_disk_bytes = config->total_disk_bytes;
     node->info.status = NODE_ACTIVE;
 
     if (etcd_lease_grant(client, NODE_LEASE_TTL, &node->lease) != 0) {
@@ -34,36 +34,36 @@ cluster_node_t *cluster_node_join(etcd_client_t *client,
     }
 
     snprintf(node->node_key, sizeof(node->node_key),
-             ETCD_PREFIX_TOPOLOGY "/node/%u", cfg->node_id);
+             ETCD_PREFIX_TOPOLOGY "/node/%u", config->node_id);
 
     char node_json[2048];
     snprintf(node_json, sizeof(node_json),
-             "{\"node_id\":%u,\"dc_id\":%u,\"host\":\"%s\","
+             "{\"node_id\":%u,\"datacenter_id\":%u,\"host\":\"%s\","
              "\"gateway_port\":%u,\"meta_port\":%u,\"access_port\":%u,"
              "\"disk_count\":%lu,\"total_disk_bytes\":%lu,\"status\":\"active\"}",
-             cfg->node_id, cfg->dc_id, cfg->host,
-             cfg->gateway_port, cfg->meta_port, cfg->access_port,
-             (unsigned long)cfg->disk_count,
-             (unsigned long)cfg->total_disk_bytes);
+             config->node_id, config->datacenter_id, config->host,
+             config->gateway_port, config->meta_port, config->access_port,
+             (unsigned long)config->disk_count,
+             (unsigned long)config->total_disk_bytes);
 
-    if (etcd_kv_put(client, node->node_key, node_json, node->lease.id) != 0) {
+    if (etcd_key_value_put(client, node->node_key, node_json, node->lease.id) != 0) {
         etcd_lease_revoke(client, node->lease.id);
         free(node);
         return NULL;
     }
 
-    char svc_key[1024];
-    char svc_val[256];
+    char service_key[1024];
+    char service_value[256];
 
-    snprintf(svc_key, sizeof(svc_key),
-             ETCD_PREFIX_DISCOVERY "/gateways/node_%u", cfg->node_id);
-    snprintf(svc_val, sizeof(svc_val), "%s:%u", cfg->host, cfg->gateway_port);
-    etcd_kv_put(client, svc_key, svc_val, node->lease.id);
+    snprintf(service_key, sizeof(service_key),
+             ETCD_PREFIX_DISCOVERY "/gateways/node_%u", config->node_id);
+    snprintf(service_value, sizeof(service_value), "%s:%u", config->host, config->gateway_port);
+    etcd_key_value_put(client, service_key, service_value, node->lease.id);
 
-    snprintf(svc_key, sizeof(svc_key),
-             ETCD_PREFIX_DISCOVERY "/meta/node_%u", cfg->node_id);
-    snprintf(svc_val, sizeof(svc_val), "%s:%u", cfg->host, cfg->meta_port);
-    etcd_kv_put(client, svc_key, svc_val, node->lease.id);
+    snprintf(service_key, sizeof(service_key),
+             ETCD_PREFIX_DISCOVERY "/meta/node_%u", config->node_id);
+    snprintf(service_value, sizeof(service_value), "%s:%u", config->host, config->meta_port);
+    etcd_key_value_put(client, service_key, service_value, node->lease.id);
 
     return node;
 }
@@ -83,7 +83,7 @@ int cluster_node_leave(cluster_node_t *node) {
              "{\"node_id\":%u,\"status\":\"draining\"}",
              node->info.node_id);
 
-    etcd_kv_put(node->client, node->node_key, node_json, node->lease.id);
+    etcd_key_value_put(node->client, node->node_key, node_json, node->lease.id);
 
     return etcd_lease_revoke(node->client, node->lease.id);
 }

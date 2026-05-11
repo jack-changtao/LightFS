@@ -2,27 +2,27 @@
 #include <string.h>
 #include <stdio.h>
 
-int s3_xml_parse(const void *xml, uint32_t len) {
+int s3_xml_parse(const void *xml, uint32_t length) {
     /* Phase 2: stub — full XML parsing deferred to Phase 3 */
-    (void)xml; (void)len;
+    (void)xml; (void)length;
     return 0;
 }
 
-int s3_xml_serialize_list_objects(void *buf, int buf_size,
+int s3_xml_serialize_list_objects(void *buffer, int buffer_size,
                                    const char *bucket,
                                    const char *prefix,
                                    const char *marker,
                                    int max_keys,
                                    const char **keys,
                                    int key_count,
-                                   int truncated) {
-    if (!buf || buf_size <= 0 || !bucket) return -1;
+                                   int is_truncated) {
+    if (!buffer || buffer_size <= 0 || !bucket) return -1;
 
-    char *p = (char *)buf;
-    int remaining = buf_size;
-    int n;
+    char *cursor = (char *)buffer;
+    int remaining = buffer_size;
+    int written;
 
-    n = snprintf(p, remaining,
+    written = snprintf(cursor, remaining,
                  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                  "<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\n"
                  "<Name>%s</Name>"
@@ -30,42 +30,42 @@ int s3_xml_serialize_list_objects(void *buf, int buf_size,
                  "<Marker>%s</Marker>"
                  "<MaxKeys>%d</MaxKeys>",
                  bucket, prefix, marker, max_keys);
-    if (n < 0 || n >= remaining) return -1;
-    p += n;
-    remaining -= n;
+    if (written < 0 || written >= remaining) return -1;
+    cursor += written;
+    remaining -= written;
 
-    if (truncated) {
-        n = snprintf(p, remaining,
+    if (is_truncated) {
+        written = snprintf(cursor, remaining,
                      "<IsTruncated>true</IsTruncated>"
                      "<NextMarker>%s</NextMarker>", marker);
     } else {
-        n = snprintf(p, remaining, "<IsTruncated>false</IsTruncated>");
+        written = snprintf(cursor, remaining, "<IsTruncated>false</IsTruncated>");
     }
-    if (n < 0 || n >= remaining) return -1;
-    p += n;
-    remaining -= n;
+    if (written < 0 || written >= remaining) return -1;
+    cursor += written;
+    remaining -= written;
 
     for (int i = 0; i < key_count; i++) {
-        n = snprintf(p, remaining, "<Contents><Key>%s</Key></Contents>", keys[i]);
-        if (n < 0 || n >= remaining) return -1;
-        p += n;
-        remaining -= n;
+        written = snprintf(cursor, remaining, "<Contents><Key>%s</Key></Contents>", keys[i]);
+        if (written < 0 || written >= remaining) return -1;
+        cursor += written;
+        remaining -= written;
     }
 
-    n = snprintf(p, remaining, "</ListBucketResult>\n");
-    if (n < 0 || n >= remaining) return -1;
-    p += n;
-    remaining -= n;
+    written = snprintf(cursor, remaining, "</ListBucketResult>\n");
+    if (written < 0 || written >= remaining) return -1;
+    cursor += written;
+    remaining -= written;
 
-    return (int)(p - (char *)buf);
+    return (int)(cursor - (char *)buffer);
 }
 
-int s3_xml_serialize_error(void *buf, int buf_size,
+int s3_xml_serialize_error(void *buffer, int buffer_size,
                             const char *code,
                             const char *message) {
-    if (!buf || buf_size <= 0 || !code || !message) return -1;
+    if (!buffer || buffer_size <= 0 || !code || !message) return -1;
 
-    return snprintf((char *)buf, buf_size,
+    return snprintf((char *)buffer, buffer_size,
                     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                     "<Error>"
                     "<Code>%s</Code>"

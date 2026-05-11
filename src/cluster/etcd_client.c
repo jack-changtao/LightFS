@@ -11,13 +11,13 @@ struct etcd_client {
 };
 
 etcd_client_t *etcd_client_create(const char *host, uint16_t port) {
-    etcd_client_t *c = calloc(1, sizeof(etcd_client_t));
-    if (!c) return NULL;
+    etcd_client_t *client = calloc(1, sizeof(etcd_client_t));
+    if (!client) return NULL;
 
-    strncpy(c->host, host ? host : ETCD_DEFAULT_HOST, sizeof(c->host) - 1);
-    c->port = port ? port : ETCD_DEFAULT_PORT;
+    strncpy(client->host, host ? host : ETCD_DEFAULT_HOST, sizeof(client->host) - 1);
+    client->port = port ? port : ETCD_DEFAULT_PORT;
 
-    return c;
+    return client;
 }
 
 void etcd_client_destroy(etcd_client_t *client) {
@@ -44,39 +44,39 @@ int etcd_lease_revoke(etcd_client_t *client, uint64_t lease_id) {
     return 0;
 }
 
-int etcd_kv_put(etcd_client_t *client, const char *key, const char *value,
+int etcd_key_value_put(etcd_client_t *client, const char *key, const char *value,
                  uint64_t lease_id) {
     if (!client || !key || !value) return -1;
 
     return mock_etcd_put(key, value, lease_id);
 }
 
-int etcd_kv_get(etcd_client_t *client, const char *key,
-                 etcd_kv_response_t *resp) {
-    if (!client || !key || !resp) return -1;
+int etcd_key_value_get(etcd_client_t *client, const char *key,
+                 etcd_key_value_response_t *response) {
+    if (!client || !key || !response) return -1;
 
     char value[4096];
-    int rc = mock_etcd_get(key, value, sizeof(value), NULL, NULL);
-    if (rc == 0) {
-        resp->key = strdup(key);
-        resp->value = strdup(value);
+    int result = mock_etcd_get(key, value, sizeof(value), NULL, NULL);
+    if (result == 0) {
+        response->key = strdup(key);
+        response->value = strdup(value);
         return 0;
     }
-    resp->key = NULL;
-    resp->value = NULL;
+    response->key = NULL;
+    response->value = NULL;
     return -1;
 }
 
-int etcd_kv_delete(etcd_client_t *client, const char *key) {
+int etcd_key_value_delete(etcd_client_t *client, const char *key) {
     if (!client || !key) return -1;
     return mock_etcd_delete(key);
 }
 
 int etcd_watch_prefix(etcd_client_t *client, const char *prefix,
-                       etcd_watch_cb cb, void *ctx) {
-    if (!client || !prefix || !cb) return -1;
-    (void)cb;
-    (void)ctx;
+                       etcd_watch_callback callback, void *context) {
+    if (!client || !prefix || !callback) return -1;
+    (void)callback;
+    (void)context;
     return 0;
 }
 
@@ -86,24 +86,24 @@ int etcd_watch_cancel(etcd_client_t *client) {
     return 0;
 }
 
-int etcd_kv_list(etcd_client_t *client, const char *prefix,
-                  etcd_kv_response_t **results, int *count) {
+int etcd_key_value_list(etcd_client_t *client, const char *prefix,
+                  etcd_key_value_response_t **results, int *count) {
     if (!client || !prefix || !results || !count) return -1;
 
     char keys[256][1024];
-    int n = mock_etcd_list(prefix, keys, 256);
+    int key_count = mock_etcd_list(prefix, keys, 256);
 
-    if (n <= 0) {
+    if (key_count <= 0) {
         *results = NULL;
         *count = 0;
         return 0;
     }
 
-    *results = calloc(n, sizeof(etcd_kv_response_t));
+    *results = calloc(key_count, sizeof(etcd_key_value_response_t));
     if (!*results) return -1;
 
-    *count = n;
-    for (int i = 0; i < n; i++) {
+    *count = key_count;
+    for (int i = 0; i < key_count; i++) {
         char value[4096];
         if (mock_etcd_get(keys[i], value, sizeof(value), NULL, NULL) == 0) {
             (*results)[i].key = strdup(keys[i]);

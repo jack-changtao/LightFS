@@ -3,15 +3,15 @@
 #include <string.h>
 
 struct fragment_router {
-    service_discovery_t *sd;
+    service_discovery_t *discovery;
 };
 
-fragment_router_t *fragment_router_create(service_discovery_t *sd) {
-    if (!sd) return NULL;
-    fragment_router_t *r = calloc(1, sizeof(fragment_router_t));
-    if (!r) return NULL;
-    r->sd = sd;
-    return r;
+fragment_router_t *fragment_router_create(service_discovery_t *discovery) {
+    if (!discovery) return NULL;
+    fragment_router_t *router = calloc(1, sizeof(fragment_router_t));
+    if (!router) return NULL;
+    router->discovery = discovery;
+    return router;
 }
 
 void fragment_router_destroy(fragment_router_t *router) {
@@ -29,7 +29,7 @@ int fragment_router_send(fragment_router_t *router,
         fragments[i].location.segment_id = fake_segment++;
         fragments[i].location.offset = i * 4096;
         fragments[i].location.size = fragments[i].size;
-        fragments[i].location.crc = 0;
+        fragments[i].location.checksum = 0;
     }
     return 0;
 }

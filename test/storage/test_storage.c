@@ -8,49 +8,49 @@
 #include "journal.h"
 #include "cow_btree.h"
 
-static int g_put_rc;
-static blob_location_t g_put_loc;
-static int g_get_rc;
+static int g_put_result;
+static blob_location_t g_put_location;
+static int g_get_result;
 static void *g_get_data;
 static uint32_t g_get_size;
-static int g_delete_rc;
+static int g_delete_result;
 
-static void test_put_cb(int rc, const blob_location_t *loc, void *arg) {
-    g_put_rc = rc;
-    if (loc) g_put_loc = *loc;
-    *(int *)arg = 1;
+static void test_put_callback(int result, const blob_location_t *location, void *user_data) {
+    g_put_result = result;
+    if (location) g_put_location = *location;
+    *(int *)user_data= 1;
 }
 
-static void test_get_cb(int rc, const void *data, uint32_t size, void *arg) {
-    g_get_rc = rc;
+static void test_get_callback(int result, const void *data, uint32_t size, void *user_data) {
+    g_get_result = result;
     g_get_data = (void *)data;
     g_get_size = size;
-    *(int *)arg = 1;
+    *(int *)user_data= 1;
 }
 
-static void test_delete_cb(int rc, void *arg) {
-    g_delete_rc = rc;
-    *(int *)arg = 1;
+static void test_delete_callback(int result, void *user_data) {
+    g_delete_result = result;
+    *(int *)user_data= 1;
 }
 
 void test_segment_manager(void) {
     printf("Running segment manager test...\n");
 
-    segment_manager_t *mgr = segment_manager_init(4096);
-    assert(mgr != NULL);
-    assert(mgr->segment_size == 4096);
+    segment_manager_t *manager = segment_manager_initialize(4096);
+    assert(manager != NULL);
+    assert(manager->segment_size == 4096);
 
-    segment_t *seg = segment_alloc(mgr, SEG_TYPE_DATA);
-    assert(seg != NULL);
-    assert(seg->state == SEG_ACTIVE);
+    segment_t *segment = segment_allocate(manager, SEGMENT_TYPE_DATA);
+    assert(segment != NULL);
+    assert(segment->state == SEGMENT_ACTIVE);
 
-    segment_seal(seg);
-    assert(seg->state == SEG_SEALED);
+    segment_seal(segment);
+    assert(segment->state == SEGMENT_SEALED);
 
-    segment_free(seg);
-    assert(seg->state == SEG_FREE);
+    segment_free(segment);
+    assert(segment->state == SEGMENT_FREE);
 
-    segment_manager_destroy(mgr);
+    segment_manager_destroy(manager);
     printf("segment manager test PASSED\n");
 }
 
@@ -60,22 +60,22 @@ void test_cow_btree(void) {
     cow_btree_t *tree = cow_btree_create();
     assert(tree != NULL);
 
-    blob_location_t loc = {.segment_id = 1, .offset = 100, .size = 512};
+    blob_location_t location = {.segment_id = 1, .offset = 100, .size = 512};
 
-    int rc = cow_btree_insert(tree, 123, &loc);
-    assert(rc == 0);
+    int result = cow_btree_insert(tree, 123, &location);
+    assert(result== 0);
 
-    blob_location_t lookup_loc;
-    rc = cow_btree_lookup(tree, 123, &lookup_loc);
-    assert(rc == 0);
-    assert(lookup_loc.segment_id == 1);
-    assert(lookup_loc.offset == 100);
+    blob_location_t lookup_location;
+    result =cow_btree_lookup(tree, 123, &lookup_loc);
+    assert(result== 0);
+    assert(lookup_location.segment_id == 1);
+    assert(lookup_location.offset == 100);
 
-    rc = cow_btree_delete(tree, 123);
-    assert(rc == 0);
+    result =cow_btree_delete(tree, 123);
+    assert(result== 0);
 
-    rc = cow_btree_lookup(tree, 123, &lookup_loc);
-    assert(rc == -1);
+    result =cow_btree_lookup(tree, 123, &lookup_loc);
+    assert(result== -1);
 
     cow_btree_destroy(tree);
     printf("btree test PASSED\n");
@@ -84,39 +84,39 @@ void test_cow_btree(void) {
 void test_journal(void) {
     printf("Running journal test...\n");
 
-    segment_manager_t *mgr = segment_manager_init(4096);
-    assert(mgr != NULL);
+    segment_manager_t *manager = segment_manager_initialize(4096);
+    assert(manager != NULL);
 
-    journal_t *j = journal_init(mgr);
-    assert(j != NULL);
+    journal_t *journal = journal_init(manager);
+    assert(journal != NULL);
 
-    blob_location_t loc = {.segment_id = 1, .offset = 0, .size = 256};
+    blob_location_t location = {.segment_id = 1, .offset = 0, .size = 256};
 
-    int rc = journal_append_put(j, 100, &loc);
-    assert(rc == 0);
-    assert(j->write_seq == 1);
+    int result = journal_append_put(journal, 100, &location);
+    assert(result== 0);
+    assert(journal->write_sequence == 1);
 
-    rc = journal_append_delete(j, 200);
-    assert(rc == 0);
-    assert(j->write_seq == 2);
+    result =journal_append_delete(journal, 200);
+    assert(result== 0);
+    assert(journal->write_sequence == 2);
 
-    journal_seal(j);
-    assert(j->segment->state == SEG_SEALED);
+    journal_seal(journal);
+    assert(journal->segment->state == SEGMENT_SEALED);
 
-    journal_destroy(j);
-    segment_manager_destroy(mgr);
+    journal_destroy(journal);
+    segment_manager_destroy(manager);
     printf("journal test PASSED\n");
 }
 
 void test_bs_init_destroy(void) {
     printf("Running bs init/destroy test...\n");
 
-    int rc = bs_init(NULL);
-    assert(rc == -1);
+    int result = bs_init(NULL);
+    assert(result== -1);
 
-    bs_config_t cfg = {.segment_size = 4096};
-    rc = bs_init(&cfg);
-    assert(rc == 0);
+    bs_config_t config = {.segment_size = 4096};
+    result =bs_init(&config);
+    assert(result== 0);
 
     bs_destroy();
     printf("bs init/destroy test PASSED\n");
@@ -125,23 +125,23 @@ void test_bs_init_destroy(void) {
 void test_bs_put_get(void) {
     printf("Running bs put/get test...\n");
 
-    bs_config_t cfg = {.segment_size = 4096};
-    int rc = bs_init(&cfg);
-    assert(rc == 0);
+    bs_config_t config = {.segment_size = 4096};
+    int result = bs_init(&config);
+    assert(result== 0);
 
     int done = 0;
     const char *data = "Hello, LightFS!";
     uint32_t size = strlen(data);
 
-    rc = bs_put_blob(1, data, size, test_put_cb, &done);
-    assert(rc == 0);
-    assert(g_put_rc == 0);
-    assert(g_put_loc.size == size);
+    result =bs_put_blob(1, data, size, test_put_callback, &done);
+    assert(result== 0);
+    assert(g_put_result == 0);
+    assert(g_put_location.size == size);
 
     done = 0;
-    rc = bs_get_blob(&g_put_loc, test_get_cb, &done);
-    assert(rc == 0);
-    assert(g_get_rc == 0);
+    result =bs_get_blob(&g_put_location, test_get_callback, &done);
+    assert(result== 0);
+    assert(g_get_result == 0);
     assert(g_get_size == size);
 
     bs_destroy();
@@ -151,27 +151,27 @@ void test_bs_put_get(void) {
 void test_bs_delete_stat(void) {
     printf("Running bs delete/stat test...\n");
 
-    bs_config_t cfg = {.segment_size = 4096};
-    int rc = bs_init(&cfg);
-    assert(rc == 0);
+    bs_config_t config = {.segment_size = 4096};
+    int result = bs_init(&config);
+    assert(result== 0);
 
     int done = 0;
     const char *data = "Test data";
-    rc = bs_put_blob(999, data, strlen(data), test_put_cb, &done);
-    assert(rc == 0);
+    result =bs_put_blob(999, data, strlen(data), test_put_callback, &done);
+    assert(result== 0);
 
     blob_state_t state;
-    rc = bs_stat_blob(999, &state);
-    assert(rc == 0);
+    result =bs_stat_blob(999, &state);
+    assert(result== 0);
     assert(state == BLOB_STATE_ACTIVE);
 
     done = 0;
-    rc = bs_delete_blob(999, test_delete_cb, &done);
-    assert(rc == 0);
-    assert(g_delete_rc == 0);
+    result =bs_delete_blob(999, test_delete_callback, &done);
+    assert(result== 0);
+    assert(g_delete_result == 0);
 
-    rc = bs_stat_blob(999, &state);
-    assert(rc == 0);
+    result =bs_stat_blob(999, &state);
+    assert(result== 0);
     assert(state == BLOB_STATE_FREE);
 
     bs_destroy();

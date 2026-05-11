@@ -2,157 +2,157 @@
 #include <stdlib.h>
 #include <string.h>
 
-gateway_t *gateway_create(const gateway_config_t *cfg,
-                           service_discovery_t *sd,
+gateway_t *gateway_create(const gateway_config_t *config,
+                           service_discovery_t *discovery,
                            etcd_client_t *etcd) {
-    if (!cfg || !sd || !etcd) return NULL;
+    if (!config || !discovery || !etcd) return NULL;
 
-    gateway_t *gw = calloc(1, sizeof(gateway_t));
-    if (!gw) return NULL;
+    gateway_t *gateway = calloc(1, sizeof(gateway_t));
+    if (!gateway) return NULL;
 
-    gw->config = *cfg;
-    gw->sd = sd;
-    gw->etcd = etcd;
+    gateway->config = *config;
+    gateway->discovery = discovery;
+    gateway->etcd = etcd;
 
-    gw->placement = placement_engine_create(sd);
-    if (!gw->placement) {
-        free(gw);
+    gateway->placement = placement_engine_create(discovery);
+    if (!gateway->placement) {
+        free(gateway);
         return NULL;
     }
 
-    gw->router = fragment_router_create(sd);
-    if (!gw->router) {
-        placement_engine_destroy(gw->placement);
-        free(gw);
+    gateway->router = fragment_router_create(discovery);
+    if (!gateway->router) {
+        placement_engine_destroy(gateway->placement);
+        free(gateway);
         return NULL;
     }
 
-    gw->cache = manifest_cache_create(cfg->manifest_cache_size > 0 ?
-                                       cfg->manifest_cache_size :
+    gateway->cache = manifest_cache_create(config->manifest_cache_size > 0 ?
+                                       config->manifest_cache_size :
                                        GATEWAY_MANIFEST_CACHE_SIZE);
-    if (!gw->cache) {
-        fragment_router_destroy(gw->router);
-        placement_engine_destroy(gw->placement);
-        free(gw);
+    if (!gateway->cache) {
+        fragment_router_destroy(gateway->router);
+        placement_engine_destroy(gateway->placement);
+        free(gateway);
         return NULL;
     }
 
-    gw->ec_engines[EC_REPLICATION_2X] = ec_engine_create(1, 1);
-    gw->ec_engines[EC_REPLICATION_3X] = ec_engine_create(1, 2);
-    gw->ec_engines[EC_6_PLUS_3] = ec_engine_create(6, 3);
-    gw->ec_engines[EC_10_PLUS_4] = ec_engine_create(10, 4);
+    gateway->erasure_coding_engines[ERASURE_CODING_REPLICATION_2X] = erasure_coding_engine_create(1, 1);
+    gateway->erasure_coding_engines[ERASURE_CODING_REPLICATION_3X] = erasure_coding_engine_create(1, 2);
+    gateway->erasure_coding_engines[ERASURE_CODING_6_PLUS_3] = erasure_coding_engine_create(6, 3);
+    gateway->erasure_coding_engines[ERASURE_CODING_10_PLUS_4] = erasure_coding_engine_create(10, 4);
 
-    gw->meta_batch.capacity = 64;
-    gw->meta_batch.manifests = calloc(gw->meta_batch.capacity, sizeof(object_manifest_t));
+    gateway->meta_batch.capacity = 64;
+    gateway->meta_batch.manifests = calloc(gateway->meta_batch.capacity, sizeof(object_manifest_t));
 
-    return gw;
+    return gateway;
 }
 
-void gateway_destroy(gateway_t *gw) {
-    if (!gw) return;
+void gateway_destroy(gateway_t *gateway) {
+    if (!gateway) return;
     for (int i = 0; i < 4; i++) {
-        if (gw->ec_engines[i]) ec_engine_destroy(gw->ec_engines[i]);
+        if (gateway->erasure_coding_engines[i]) erasure_coding_engine_destroy(gateway->erasure_coding_engines[i]);
     }
-    free(gw->meta_batch.manifests);
-    manifest_cache_destroy(gw->cache);
-    fragment_router_destroy(gw->router);
-    placement_engine_destroy(gw->placement);
-    free(gw);
+    free(gateway->meta_batch.manifests);
+    manifest_cache_destroy(gateway->cache);
+    fragment_router_destroy(gateway->router);
+    placement_engine_destroy(gateway->placement);
+    free(gateway);
 }
 
-static ec_policy_t select_ec_policy(gateway_t *gw, uint64_t object_size) {
+static erasure_coding_policy_t select_erasure_coding_policy(gateway_t *gateway, uint64_t object_size) {
     if (object_size < GATEWAY_SMALL_THRESHOLD) {
-        return gw->config.default_replication_factor == 3 ?
-               EC_REPLICATION_3X : EC_REPLICATION_2X;
+        return gateway->config.default_replication_factor == 3 ?
+               ERASURE_CODING_REPLICATION_3X : ERASURE_CODING_REPLICATION_2X;
     }
-    if (object_size < GATEWAY_MEDIUM_THRESHOLD) return EC_6_PLUS_3;
-    return EC_10_PLUS_4;
+    if (object_size < GATEWAY_MEDIUM_THRESHOLD) return ERASURE_CODING_6_PLUS_3;
+    return ERASURE_CODING_10_PLUS_4;
 }
 
-int gateway_put_object(gateway_t *gw, const gateway_put_request_t *req) {
-    if (!gw || !req || !req->data) return -1;
+int gateway_put_object(gateway_t *gateway, const gateway_put_request_t *request) {
+    if (!gateway || !request || !request->data) return -1;
 
-    ec_policy_t policy = req->ec_override ?
-                         req->ec_policy_override :
-                         select_ec_policy(gw, req->size);
+    erasure_coding_policy_t policy = request->has_erasure_coding_override ?
+                         request->erasure_coding_policy_override :
+                         select_erasure_coding_policy(gateway, request->size);
 
-    ec_engine_t *ec = gw->ec_engines[policy];
-    if (!ec) return -1;
+    erasure_coding_engine_t *erasure_coding_engine = gateway->erasure_coding_engines[policy];
+    if (!erasure_coding_engine) return -1;
 
-    int k = ec_get_k(ec);
-    int m = ec_get_m(ec);
-    int total = k + m;
+    int data_fragment_count = erasure_coding_get_data_fragment_count(erasure_coding_engine);
+    int parity_fragment_count = erasure_coding_get_parity_fragment_count(erasure_coding_engine);
+    int total = data_fragment_count + parity_fragment_count;
 
     placement_target_t targets[GATEWAY_MAX_FRAGMENTS];
-    int count = placement_select_targets(gw->placement, k, m, targets, total);
+    int count = placement_select_targets(gateway->placement, data_fragment_count, parity_fragment_count, targets, total);
     if (count != total) return -1;
 
-    uint8_t *frag_data[GATEWAY_MAX_FRAGMENTS];
-    uint64_t frag_sizes[GATEWAY_MAX_FRAGMENTS];
-    int rc = ec_encode(ec, req->data, req->size, frag_data, frag_sizes);
-    if (rc != 0) return -1;
+    uint8_t *fragment_data[GATEWAY_MAX_FRAGMENTS];
+    uint64_t fragment_sizes[GATEWAY_MAX_FRAGMENTS];
+    int result = erasure_coding_encode(erasure_coding_engine, request->data, request->size, fragment_data, fragment_sizes);
+    if (result != 0) return -1;
 
     fragment_t fragments[GATEWAY_MAX_FRAGMENTS];
     for (int i = 0; i < total; i++) {
         fragments[i].fragment_index = (uint32_t)i;
         fragments[i].node_id = targets[i].node_id;
         fragments[i].disk_id = targets[i].disk_id;
-        fragments[i].data = frag_data[i];
-        fragments[i].size = (uint32_t)frag_sizes[i];
+        fragments[i].data = fragment_data[i];
+        fragments[i].size = (uint32_t)fragment_sizes[i];
     }
 
-    rc = fragment_router_send(gw->router, fragments, total, 3);
-    for (int i = 0; i < total; i++) free(frag_data[i]);
-    if (rc != 0) return -1;
+    result = fragment_router_send(gateway->router, fragments, total, 3);
+    for (int i = 0; i < total; i++) free(fragment_data[i]);
+    if (result != 0) return -1;
 
     object_manifest_t manifest;
     memset(&manifest, 0, sizeof(manifest));
-    strncpy(manifest.bucket, req->bucket, sizeof(manifest.bucket) - 1);
-    strncpy(manifest.key, req->key, sizeof(manifest.key) - 1);
-    manifest.size = req->size;
+    strncpy(manifest.bucket, request->bucket, sizeof(manifest.bucket) - 1);
+    strncpy(manifest.key, request->key, sizeof(manifest.key) - 1);
+    manifest.size = request->size;
     manifest.fragment_count = (uint32_t)total;
-    manifest.write_seq = 0;
-    manifest.dc_id = gw->config.dc_id;
+    manifest.write_sequence = 0;
+    manifest.datacenter_id = gateway->config.datacenter_id;
 
-    manifest_cache_insert(gw->cache, req->bucket, req->key, &manifest);
+    manifest_cache_insert(gateway->cache, request->bucket, request->key, &manifest);
 
-    if (gw->meta_batch.count < gw->meta_batch.capacity) {
-        gw->meta_batch.manifests[gw->meta_batch.count++] = manifest;
+    if (gateway->meta_batch.count < gateway->meta_batch.capacity) {
+        gateway->meta_batch.manifests[gateway->meta_batch.count++] = manifest;
     }
 
     return 0;
 }
 
-int gateway_get_object(gateway_t *gw,
+int gateway_get_object(gateway_t *gateway,
                         const char *bucket, const char *key,
-                        gateway_get_response_t *resp) {
-    if (!gw || !bucket || !key || !resp) return -1;
+                        gateway_get_response_t *response) {
+    if (!gateway || !bucket || !key || !response) return -1;
 
     object_manifest_t manifest;
-    int rc = manifest_cache_lookup(gw->cache, bucket, key, &manifest);
-    if (rc != 0) return -1;
+    int result = manifest_cache_lookup(gateway->cache, bucket, key, &manifest);
+    if (result != 0) return -1;
 
-    resp->data = calloc(1, manifest.size > 0 ? manifest.size : 1);
-    if (!resp->data) return -1;
-    resp->size = manifest.size;
-    resp->rc = 0;
+    response->data = calloc(1, manifest.size > 0 ? manifest.size : 1);
+    if (!response->data) return -1;
+    response->size = manifest.size;
+    response->error_code = 0;
 
     return 0;
 }
 
-int gateway_delete_object(gateway_t *gw,
+int gateway_delete_object(gateway_t *gateway,
                            const char *bucket, const char *key) {
-    if (!gw || !bucket || !key) return -1;
+    if (!gateway || !bucket || !key) return -1;
 
-    manifest_cache_invalidate(gw->cache, bucket, key);
+    manifest_cache_invalidate(gateway->cache, bucket, key);
 
     return 0;
 }
 
-void gateway_set_ec_policy(gateway_t *gw, ec_policy_t policy) {
-    if (gw) gw->config.default_ec_policy = policy;
+void gateway_set_erasure_coding_policy(gateway_t *gateway, erasure_coding_policy_t policy) {
+    if (gateway) gateway->config.default_erasure_coding_policy = policy;
 }
 
-struct placement_engine *gateway_get_placement(gateway_t *gw) {
-    return gw ? gw->placement : NULL;
+struct placement_engine *gateway_get_placement(gateway_t *gateway) {
+    return gateway ? gateway->placement : NULL;
 }

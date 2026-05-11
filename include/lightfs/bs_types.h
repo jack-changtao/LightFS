@@ -15,7 +15,7 @@ typedef struct {
     segment_id_t segment_id;
     uint64_t offset;
     uint32_t size;
-    uint32_t crc;
+    uint32_t checksum;
 } blob_location_t;
 
 typedef enum {

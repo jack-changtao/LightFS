@@ -11,9 +11,9 @@ void test_join_and_get_info(void) {
 
     mock_etcd_init();
 
-    cluster_node_config_t cfg = {
+    cluster_node_config_t config = {
         .node_id = 1,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .host = "10.0.0.1",
         .gateway_port = 8080,
         .meta_port = 9090,
@@ -25,13 +25,13 @@ void test_join_and_get_info(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_node_t *node = cluster_node_join(client, &cfg);
+    cluster_node_t *node = cluster_node_join(client, &config);
     assert(node != NULL);
 
     const cluster_node_info_t *info = cluster_node_get_info(node);
     assert(info != NULL);
     assert(info->node_id == 1);
-    assert(info->dc_id == 0);
+    assert(info->datacenter_id == 0);
     assert(info->gateway_port == 8080);
     assert(info->status == NODE_ACTIVE);
 
@@ -45,9 +45,9 @@ void test_heartbeat_succeeds(void) {
 
     mock_etcd_init();
 
-    cluster_node_config_t cfg = {
+    cluster_node_config_t config = {
         .node_id = 2,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .host = "10.0.0.2",
         .gateway_port = 8080,
         .meta_port = 9090,
@@ -59,11 +59,11 @@ void test_heartbeat_succeeds(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_node_t *node = cluster_node_join(client, &cfg);
+    cluster_node_t *node = cluster_node_join(client, &config);
     assert(node != NULL);
 
-    int rc = cluster_node_heartbeat(node);
-    assert(rc == 0);
+    int result = cluster_node_heartbeat(node);
+    assert(result== 0);
 
     cluster_node_destroy(node);
     etcd_client_destroy(client);
@@ -75,9 +75,9 @@ void test_leave_sets_draining(void) {
 
     mock_etcd_init();
 
-    cluster_node_config_t cfg = {
+    cluster_node_config_t config = {
         .node_id = 3,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .host = "10.0.0.3",
         .gateway_port = 8080,
         .meta_port = 9090,
@@ -89,11 +89,11 @@ void test_leave_sets_draining(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_node_t *node = cluster_node_join(client, &cfg);
+    cluster_node_t *node = cluster_node_join(client, &config);
     assert(node != NULL);
 
-    int rc = cluster_node_leave(node);
-    assert(rc == 0);
+    int result = cluster_node_leave(node);
+    assert(result== 0);
 
     const cluster_node_info_t *info = cluster_node_get_info(node);
     assert(info != NULL);

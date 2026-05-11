@@ -38,7 +38,7 @@ int cow_btree_insert(cow_btree_t *tree, btree_key_t key,
     while (i >= 0 && node->keys[i] > key) {
         if (node->keys[i] == key) {
             node->values[i] = *value;
-            tree->dirty = 1;
+            tree->is_dirty = 1;
             return 0;
         }
         node->keys[i + 1] = node->keys[i];
@@ -48,7 +48,7 @@ int cow_btree_insert(cow_btree_t *tree, btree_key_t key,
     node->keys[i + 1] = key;
     node->values[i + 1] = *value;
     node->count++;
-    tree->dirty = 1;
+    tree->is_dirty = 1;
     return 0;
 }
 
@@ -91,50 +91,50 @@ int cow_btree_delete(cow_btree_t *tree, btree_key_t key) {
                 node->values[j] = node->values[j + 1];
             }
             node->count--;
-            tree->dirty = 1;
+            tree->is_dirty = 1;
             return 0;
         }
     }
     return -1;
 }
 
-int cow_btree_serialize(cow_btree_t *tree, void *buf, int buf_size) {
-    if (!tree || !buf || buf_size < (int)sizeof(uint32_t)) return -1;
+int cow_btree_serialize(cow_btree_t *tree, void *buffer, int buffer_size) {
+    if (!tree || !buffer || buffer_size < (int)sizeof(uint32_t)) return -1;
 
-    uint8_t *p = buf;
+    uint8_t *cursor = buffer;
     uint32_t node_count = 1;
 
-    memcpy(p, &node_count, sizeof(node_count));
-    p += sizeof(node_count);
+    memcpy(cursor, &node_count, sizeof(node_count));
+    cursor += sizeof(node_count);
 
-    memcpy(p, &tree->root->count, sizeof(tree->root->count));
-    p += sizeof(tree->root->count);
+    memcpy(cursor, &tree->root->count, sizeof(tree->root->count));
+    cursor += sizeof(tree->root->count);
 
-    memcpy(p, tree->root->keys, tree->root->count * sizeof(btree_key_t));
-    p += tree->root->count * sizeof(btree_key_t);
+    memcpy(cursor, tree->root->keys, tree->root->count * sizeof(btree_key_t));
+    cursor += tree->root->count * sizeof(btree_key_t);
 
-    memcpy(p, tree->root->values, tree->root->count * sizeof(blob_location_t));
-    p += tree->root->count * sizeof(blob_location_t);
+    memcpy(cursor, tree->root->values, tree->root->count * sizeof(blob_location_t));
+    cursor += tree->root->count * sizeof(blob_location_t);
 
-    return (int)(p - (uint8_t *)buf);
+    return (int)(cursor - (uint8_t *)buffer);
 }
 
-int cow_btree_deserialize(cow_btree_t *tree, const void *buf, int buf_size) {
-    if (!tree || !buf || buf_size < (int)sizeof(uint32_t)) return -1;
+int cow_btree_deserialize(cow_btree_t *tree, const void *buffer, int buffer_size) {
+    if (!tree || !buffer || buffer_size < (int)sizeof(uint32_t)) return -1;
 
-    const uint8_t *p = buf;
+    const uint8_t *cursor = buffer;
     uint32_t node_count;
-    memcpy(&node_count, p, sizeof(node_count));
-    p += sizeof(node_count);
+    memcpy(&node_count, cursor, sizeof(node_count));
+    cursor += sizeof(node_count);
 
-    memcpy(&tree->root->count, p, sizeof(tree->root->count));
-    p += sizeof(tree->root->count);
+    memcpy(&tree->root->count, cursor, sizeof(tree->root->count));
+    cursor += sizeof(tree->root->count);
 
-    memcpy(tree->root->keys, p, tree->root->count * sizeof(btree_key_t));
-    p += tree->root->count * sizeof(btree_key_t);
+    memcpy(tree->root->keys, cursor, tree->root->count * sizeof(btree_key_t));
+    cursor += tree->root->count * sizeof(btree_key_t);
 
-    memcpy(tree->root->values, p, tree->root->count * sizeof(blob_location_t));
-    p += tree->root->count * sizeof(blob_location_t);
+    memcpy(tree->root->values, cursor, tree->root->count * sizeof(blob_location_t));
+    cursor += tree->root->count * sizeof(blob_location_t);
 
     tree->root->is_leaf = 1;
     return 0;

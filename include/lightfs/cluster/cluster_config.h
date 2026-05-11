@@ -26,16 +26,16 @@ typedef struct {
 typedef struct cluster_config_manager cluster_config_manager_t;
 
 cluster_config_manager_t *cluster_config_create(etcd_client_t *client);
-void cluster_config_destroy(cluster_config_manager_t *mgr);
-int cluster_config_get_ec_policy(cluster_config_manager_t *mgr,
+void cluster_config_destroy(cluster_config_manager_t *manager);
+int cluster_config_get_ec_policy(cluster_config_manager_t *manager,
                                   ec_policy_config_t *out);
-int cluster_config_get_bucket(cluster_config_manager_t *mgr,
+int cluster_config_get_bucket(cluster_config_manager_t *manager,
                                const char *bucket,
                                bucket_config_t *out);
 
-typedef void (*cluster_config_cb)(const char *key, const char *new_value,
-                                   void *ctx);
-int cluster_config_watch(cluster_config_manager_t *mgr,
-                          cluster_config_cb cb, void *ctx);
+typedef void (*cluster_config_callback)(const char *key, const char *new_value,
+                                   void *context);
+int cluster_config_watch(cluster_config_manager_t *manager,
+                          cluster_config_callback callback, void *context);
 
 #endif /* LIGHTFS_CLUSTER_CONFIG_H */

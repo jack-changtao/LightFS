@@ -9,68 +9,68 @@
 
 static int dispatch_request(const char *method, const char *uri,
                              const char *headers[], int header_count,
-                             const void *body, uint32_t body_len) {
-    s3_request_t req = {0};
-    int rc = s3_route_parse(method, uri, headers, header_count, &req);
-    if (rc != 0) {
+                             const void *body, uint32_t body_length) {
+    s3_request_t request = {0};
+    int result = s3_route_parse(method, uri, headers, header_count, &request);
+    if (result != 0) {
         printf("HTTP/1.1 400 Bad Request\r\n\r\n");
-        char buf[512];
-        int n = s3_xml_serialize_error(buf, sizeof(buf),
+        char buffer[512];
+        int written = s3_xml_serialize_error(buffer, sizeof(buffer),
                                         "InvalidRequest", "Could not parse request");
-        if (n > 0) fwrite(buf, 1, n, stdout);
+        if (written > 0) fwrite(buffer, 1, written, stdout);
         return -1;
     }
 
-    if (req.authorization[0]) {
-        sigv4_result_t auth = sigv4_validate(req.authorization, method, uri,
-                                              req.host, req.date,
-                                              body, body_len);
-        if (auth != SIGV4_OK) {
+    if (request.authorization[0]) {
+        sigv4_result_t auth = sigv4_validate(request.authorization, method, uri,
+                                              request.host, request.date,
+                                              body, body_length);
+        if (auth != SIGV4_ERROR_OK) {
             printf("HTTP/1.1 403 Forbidden\r\n\r\n");
-            char buf[512];
-            int n = s3_xml_serialize_error(buf, sizeof(buf),
+            char buffer[512];
+            int written = s3_xml_serialize_error(buffer, sizeof(buffer),
                                             "SignatureDoesNotMatch",
                                             "The request signature does not match");
-            if (n > 0) fwrite(buf, 1, n, stdout);
+            if (written > 0) fwrite(buffer, 1, written, stdout);
             return -1;
         }
     }
 
-    s3_response_t resp = {0};
-    switch (req.op) {
-    case S3_OP_PUT_OBJECT:
-        rc = s3_handler_put(&req, body, body_len, &resp);
+    s3_response_t response = {0};
+    switch (request.operation) {
+    case S3_OPERATION_PUT_OBJECT:
+        result = s3_handler_put(&request, body, body_length, &response);
         break;
-    case S3_OP_GET_OBJECT:
-        rc = s3_handler_get(&req, &resp);
+    case S3_OPERATION_GET_OBJECT:
+        result = s3_handler_get(&request, &response);
         break;
-    case S3_OP_DELETE_OBJECT:
-        rc = s3_handler_delete(&req, &resp);
+    case S3_OPERATION_DELETE_OBJECT:
+        result = s3_handler_delete(&request, &response);
         break;
-    case S3_OP_LIST_OBJECTS:
-        rc = s3_handler_list(&req, &resp);
+    case S3_OPERATION_LIST_OBJECTS:
+        result = s3_handler_list(&request, &response);
         break;
     default:
         printf("HTTP/1.1 405 Method Not Allowed\r\n\r\n");
         return -1;
     }
 
-    if (rc != 0) {
+    if (result != 0) {
         printf("HTTP/1.1 500 Internal Server Error\r\n\r\n");
         return -1;
     }
 
-    printf("HTTP/1.1 %d OK\r\n", resp.http_status);
-    if (resp.content_type) {
-        printf("Content-Type: %s\r\n", resp.content_type);
+    printf("HTTP/1.1 %d OK\r\n", response.http_status);
+    if (response.content_type) {
+        printf("Content-Type: %s\r\n", response.content_type);
     }
-    if (resp.etag[0]) {
-        printf("ETag: %s\r\n", resp.etag);
+    if (response.etag[0]) {
+        printf("ETag: %s\r\n", response.etag);
     }
-    if (resp.body && resp.body_len > 0) {
-        printf("Content-Length: %u\r\n", resp.body_len);
+    if (response.body && response.body_length > 0) {
+        printf("Content-Length: %u\r\n", response.body_length);
         printf("\r\n");
-        fwrite(resp.body, 1, resp.body_len, stdout);
+        fwrite(response.body, 1, response.body_length, stdout);
     } else {
         printf("\r\n");
     }
@@ -78,10 +78,10 @@ static int dispatch_request(const char *method, const char *uri,
     return 0;
 }
 
-int access_server_start(const access_server_config_t *cfg) {
-    if (!cfg) return -1;
+int access_server_start(const access_server_config_t *config) {
+    if (!config) return -1;
 
-    printf("Access Layer listening on %s:%d\n", cfg->listen_host, cfg->listen_port);
+    printf("Access Layer listening on %s:%d\n", config->listen_host, config->listen_port);
 
     /* Phase 2: stub — no actual HTTP server */
 

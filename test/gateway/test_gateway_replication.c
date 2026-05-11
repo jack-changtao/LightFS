@@ -7,61 +7,61 @@
 void test_add_peer(void) {
     printf("Running add_peer test...\n");
 
-    replication_engine_t *re = replication_engine_create();
-    assert(re != NULL);
+    replication_engine_t *replication = replication_engine_create();
+    assert(replication != NULL);
 
     replication_peer_t peer = {
         .peer_dc_id = 2,
         .peer_gateway_host = "10.0.2.1",
         .peer_gateway_port = 8080,
     };
-    int rc = replication_add_peer(re, &peer);
-    assert(rc == 0);
+    int result = replication_add_peer(replication, &peer);
+    assert(result== 0);
 
-    replication_engine_destroy(re);
+    replication_engine_destroy(replication);
     printf("add_peer test PASSED\n");
 }
 
 void test_enqueue_replication(void) {
     printf("Running enqueue_replication test...\n");
 
-    replication_engine_t *re = replication_engine_create();
-    assert(re != NULL);
+    replication_engine_t *replication = replication_engine_create();
+    assert(replication != NULL);
 
     replication_peer_t peer = {.peer_dc_id = 2, .peer_gateway_host = "10.0.2.1",
                                 .peer_gateway_port = 8080};
-    replication_add_peer(re, &peer);
+    replication_add_peer(replication, &peer);
 
-    object_manifest_t m;
-    memset(&m, 0, sizeof(m));
-    strncpy(m.bucket, "geo-bucket", sizeof(m.bucket) - 1);
-    strncpy(m.key, "obj1", sizeof(m.key) - 1);
-    m.size = 2048;
-    m.write_seq = 100;
-    m.dc_id = 1;
+    object_manifest_t manifest;
+    memset(&manifest, 0, sizeof(manifest));
+    strncpy(manifest.bucket, "geo-bucket", sizeof(manifest.bucket) - 1);
+    strncpy(manifest.key, "obj1", sizeof(manifest.key) - 1);
+    manifest.size = 2048;
+    manifest.write_sequence = 100;
+    manifest.datacenter_id = 1;
 
-    int rc = replication_enqueue(re, &m, NULL, m.size);
-    assert(rc == 0);
-    assert(replication_pending_count(re) == 1);
+    int result = replication_enqueue(replication, &manifest, NULL, manifest.size);
+    assert(result== 0);
+    assert(replication_pending_count(replication) == 1);
 
-    replication_engine_destroy(re);
+    replication_engine_destroy(replication);
     printf("enqueue_replication test PASSED\n");
 }
 
 void test_lww_conflict_resolution(void) {
     printf("Running lww_conflict_resolution test...\n");
 
-    int rc = replication_resolve_conflict(200, 1, 100, 2);
-    assert(rc == 1);
+    int result = replication_resolve_conflict(200, 1, 100, 2);
+    assert(result== 1);
 
-    rc = replication_resolve_conflict(50, 1, 100, 2);
-    assert(rc == 0);
+    result =replication_resolve_conflict(50, 1, 100, 2);
+    assert(result== 0);
 
-    rc = replication_resolve_conflict(100, 2, 100, 1);
-    assert(rc == 1);
+    result =replication_resolve_conflict(100, 2, 100, 1);
+    assert(result== 1);
 
-    rc = replication_resolve_conflict(100, 1, 100, 2);
-    assert(rc == 0);
+    result =replication_resolve_conflict(100, 1, 100, 2);
+    assert(result== 0);
 
     printf("lww_conflict_resolution test PASSED\n");
 }

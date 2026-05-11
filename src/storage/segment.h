@@ -6,16 +6,16 @@
 #include <stdint.h>
 
 typedef enum {
-    SEG_FREE = 0,
-    SEG_ACTIVE,
-    SEG_SEALED,
-    SEG_CLEANING,
+    SEGMENT_FREE = 0,
+    SEGMENT_ACTIVE,
+    SEGMENT_SEALED,
+    SEGMENT_CLEANING,
 } segment_state_t;
 
 typedef enum {
-    SEG_TYPE_DATA = 0,
-    SEG_TYPE_META,
-    SEG_TYPE_JOURNAL,
+    SEGMENT_TYPE_DATA = 0,
+    SEGMENT_TYPE_METADATA,
+    SEGMENT_TYPE_JOURNAL,
 } segment_type_t;
 
 typedef struct segment {
@@ -35,15 +35,15 @@ typedef struct segment_manager {
     uint64_t segment_size;
 } segment_manager_t;
 
-segment_manager_t *segment_manager_init(uint64_t segment_size);
-void segment_manager_destroy(segment_manager_t *mgr);
+segment_manager_t *segment_manager_initialize(uint64_t segment_size);
+void segment_manager_destroy(segment_manager_t *manager);
 
-segment_t *segment_alloc(segment_manager_t *mgr, segment_type_t type);
-void segment_seal(segment_t *seg);
-void segment_start_cleaning(segment_t *seg);
-void segment_free(segment_t *seg);
+segment_t *segment_allocate(segment_manager_t *manager, segment_type_t type);
+void segment_seal(segment_t *segment);
+void segment_start_cleaning(segment_t *segment);
+void segment_free(segment_t *segment);
 
-segment_t *segment_find_gc_victim(segment_manager_t *mgr,
+segment_t *segment_find_garbage_collection_victim(segment_manager_t *manager,
                                    uint32_t liveness_threshold,
                                    segment_type_t type);
 

@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CLUSTER_MAX_HOST_LEN 256
-#define CLUSTER_MAX_PATH_LEN 1024
+#define CLUSTER_MAX_HOST_LENGTH 256
+#define CLUSTER_MAX_PATH_LENGTH 1024
 #define CLUSTER_ETCD_PREFIX "/lightfs"
 
 typedef enum {
@@ -16,8 +16,8 @@ typedef enum {
 
 typedef struct cluster_node_info {
     uint32_t node_id;
-    uint32_t dc_id;
-    char host[CLUSTER_MAX_HOST_LEN + 1];
+    uint32_t datacenter_id;
+    char host[CLUSTER_MAX_HOST_LENGTH + 1];
     uint16_t gateway_port;
     uint16_t meta_port;
     uint16_t access_port;
@@ -30,14 +30,14 @@ typedef struct cluster_shard_info {
     uint32_t shard_id;
     uint32_t owner_meta_server_id;
     node_status_t status;
-    char key_min[CLUSTER_MAX_PATH_LEN + 1];
-    char key_max[CLUSTER_MAX_PATH_LEN + 1];
+    char key_min[CLUSTER_MAX_PATH_LENGTH + 1];
+    char key_max[CLUSTER_MAX_PATH_LENGTH + 1];
     uint32_t parent_shard_id;
 } cluster_shard_info_t;
 
 typedef struct service_endpoint {
     uint32_t node_id;
-    char host[CLUSTER_MAX_HOST_LEN + 1];
+    char host[CLUSTER_MAX_HOST_LENGTH + 1];
     uint16_t port;
     char service_name[64];
 } service_endpoint_t;

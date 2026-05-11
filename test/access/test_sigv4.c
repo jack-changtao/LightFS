@@ -4,18 +4,18 @@
 #include "lightfs/access/sigv4.h"
 
 static void test_validate_missing_header(void) {
-    sigv4_result_t r = sigv4_validate(NULL, "GET", "/bucket/key",
+    sigv4_result_t result =sigv4_validate(NULL, "GET", "/bucket/key",
                                        "s3.amazonaws.com", NULL, NULL, 0);
-    assert(r == SIGV4_ERR_MISSING_HEADER);
+    assert(result == SIGV4_ERROR_MISSING_HEADER);
     printf("  PASS: validate_missing_header\n");
 }
 
 static void test_validate_invalid_auth(void) {
-    sigv4_result_t r = sigv4_validate("AWS4-HMAC-SHA256 Credential=INVALID",
+    sigv4_result_t result =sigv4_validate("AWS4-HMAC-SHA256 Credential=INVALID",
                                        "GET", "/bucket/key",
                                        "s3.amazonaws.com", "20240101T000000Z",
                                        NULL, 0);
-    assert(r != SIGV4_OK);
+    assert(result != SIGV4_OK);
     printf("  PASS: validate_invalid_auth\n");
 }
 

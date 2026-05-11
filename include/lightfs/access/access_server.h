@@ -9,7 +9,7 @@ typedef struct {
     uint32_t max_request_body;
 } access_server_config_t;
 
-int access_server_start(const access_server_config_t *cfg);
+int access_server_start(const access_server_config_t *config);
 void access_server_stop(void);
 
 #endif /* LIGHTFS_ACCESS_SERVER_H */

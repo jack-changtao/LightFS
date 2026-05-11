@@ -5,11 +5,11 @@
 
 typedef enum {
     SIGV4_OK = 0,
-    SIGV4_ERR_MISSING_HEADER,
-    SIGV4_ERR_INVALID_CREDENTIAL,
-    SIGV4_ERR_INVALID_SIGNATURE,
-    SIGV4_ERR_EXPIRED,
-    SIGV4_ERR_INTERNAL,
+    SIGV4_ERROR_MISSING_HEADER,
+    SIGV4_ERROR_INVALID_CREDENTIAL,
+    SIGV4_ERROR_INVALID_SIGNATURE,
+    SIGV4_ERROR_EXPIRED,
+    SIGV4_ERROR_INTERNAL,
 } sigv4_result_t;
 
 sigv4_result_t sigv4_validate(const char *auth_header,
@@ -18,7 +18,7 @@ sigv4_result_t sigv4_validate(const char *auth_header,
                                const char *host,
                                const char *date,
                                const void *body,
-                               uint32_t body_len);
+                               uint32_t body_length);
 
 const char *sigv4_extract_access_key(const char *auth_header);
 

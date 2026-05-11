@@ -2,36 +2,36 @@
 #include <stdlib.h>
 #include <string.h>
 
-static bs_context_t *g_bs = NULL;
+static bs_context_t *g_blob_store = NULL;
 
-int bs_init(const bs_config_t *cfg) {
-    if (!cfg || g_bs) return -1;
+int bs_init(const bs_config_t *config) {
+    if (!config || g_blob_store) return -1;
 
-    g_bs = calloc(1, sizeof(bs_context_t));
-    if (!g_bs) return -1;
+    g_blob_store = calloc(1, sizeof(bs_context_t));
+    if (!g_blob_store) return -1;
 
-    g_bs->segment_size = cfg->segment_size;
-    g_bs->seg_mgr = segment_manager_init(cfg->segment_size);
-    if (!g_bs->seg_mgr) {
-        free(g_bs);
-        g_bs = NULL;
+    g_blob_store->segment_size = config->segment_size;
+    g_blob_store->segment_manager = segment_manager_initialize(config->segment_size);
+    if (!g_blob_store->segment_manager) {
+        free(g_blob_store);
+        g_blob_store = NULL;
         return -1;
     }
 
-    g_bs->index = cow_btree_create();
-    if (!g_bs->index) {
-        segment_manager_destroy(g_bs->seg_mgr);
-        free(g_bs);
-        g_bs = NULL;
+    g_blob_store->index = cow_btree_create();
+    if (!g_blob_store->index) {
+        segment_manager_destroy(g_blob_store->segment_manager);
+        free(g_blob_store);
+        g_blob_store = NULL;
         return -1;
     }
 
-    g_bs->journal = journal_init(g_bs->seg_mgr);
-    if (!g_bs->journal) {
-        cow_btree_destroy(g_bs->index);
-        segment_manager_destroy(g_bs->seg_mgr);
-        free(g_bs);
-        g_bs = NULL;
+    g_blob_store->journal = journal_init(g_blob_store->segment_manager);
+    if (!g_blob_store->journal) {
+        cow_btree_destroy(g_blob_store->index);
+        segment_manager_destroy(g_blob_store->segment_manager);
+        free(g_blob_store);
+        g_blob_store = NULL;
         return -1;
     }
 
@@ -39,131 +39,131 @@ int bs_init(const bs_config_t *cfg) {
 }
 
 void bs_destroy(void) {
-    if (!g_bs) return;
+    if (!g_blob_store) return;
 
-    if (g_bs->journal) journal_destroy(g_bs->journal);
-    if (g_bs->index) cow_btree_destroy(g_bs->index);
-    if (g_bs->seg_mgr) segment_manager_destroy(g_bs->seg_mgr);
-    free(g_bs);
-    g_bs = NULL;
+    if (g_blob_store->journal) journal_destroy(g_blob_store->journal);
+    if (g_blob_store->index) cow_btree_destroy(g_blob_store->index);
+    if (g_blob_store->segment_manager) segment_manager_destroy(g_blob_store->segment_manager);
+    free(g_blob_store);
+    g_blob_store = NULL;
 }
 
-int bs_alloc_location(blob_location_t *loc) {
-    if (!g_bs || !loc) return -1;
+int bs_allocate_location(blob_location_t *location) {
+    if (!g_blob_store || !location) return -1;
 
-    segment_t *seg = segment_alloc(g_bs->seg_mgr, SEG_TYPE_DATA);
-    if (!seg) return -1;
+    segment_t *segment = segment_allocate(g_blob_store->segment_manager, SEGMENT_TYPE_DATA);
+    if (!segment) return -1;
 
-    loc->segment_id = seg->id;
-    loc->offset = seg->used;
-    loc->size = 0;
-    loc->crc = 0;
+    location->segment_id = segment->id;
+    location->offset = segment->used;
+    location->size = 0;
+    location->checksum = 0;
     return 0;
 }
 
-int bs_write_to_segment(segment_t *seg, const void *data, uint32_t size,
+int bs_write_to_segment(segment_t *segment, const void *data, uint32_t size,
                          uint32_t *offset_out) {
-    if (!seg || !data || !offset_out) return -1;
-    if (seg->used + size > seg->size) return -1;
+    if (!segment || !data || !offset_out) return -1;
+    if (segment->used + size > segment->size) return -1;
 
-    *offset_out = seg->used;
-    seg->used += size;
+    *offset_out = segment->used;
+    segment->used += size;
     return 0;
 }
 
-int bs_read_from_segment(const segment_t *seg, uint32_t offset,
+int bs_read_from_segment(const segment_t *segment, uint32_t offset,
                           void *data, uint32_t size) {
-    (void)seg;
+    (void)segment;
     (void)data;
     (void)offset;
     (void)size;
     return 0;
 }
 
-static void put_callback(int rc, const blob_location_t *loc, void *arg) {
-    (void)rc;
-    (void)loc;
-    (void)arg;
+static void put_callback(int result, const blob_location_t *location, void *user_data) {
+    (void)result;
+    (void)location;
+    (void)user_data;
 }
 
 int bs_put_blob(blob_id_t id, const void *data, uint32_t size,
-                bs_put_cb cb, void *arg) {
-    if (!g_bs || !data) return -1;
-    if (!cb) cb = put_callback;
+                bs_put_callback callback, void *user_data) {
+    if (!g_blob_store || !data) return -1;
+    if (!callback) callback = put_callback;
 
-    blob_location_t loc;
-    if (bs_alloc_location(&loc) < 0) {
-        cb(-1, NULL, arg);
+    blob_location_t location;
+    if (bs_allocate_location(&location) < 0) {
+        callback(-1, NULL, user_data);
         return -1;
     }
 
-    loc.size = size;
-    loc.crc = 0;
+    location.size = size;
+    location.checksum = 0;
 
-    if (journal_append_put(g_bs->journal, id, &loc) < 0) {
-        cb(-1, NULL, arg);
+    if (journal_append_put(g_blob_store->journal, id, &location) < 0) {
+        callback(-1, NULL, user_data);
         return -1;
     }
 
-    cow_btree_insert(g_bs->index, id, &loc);
-    g_bs->dirty = 1;
+    cow_btree_insert(g_blob_store->index, id, &location);
+    g_blob_store->is_dirty = 1;
 
-    cb(0, &loc, arg);
+    callback(0, &location, user_data);
     return 0;
 }
 
-static void get_callback(int rc, const void *data, uint32_t size, void *arg) {
-    (void)rc;
+static void get_callback(int result, const void *data, uint32_t size, void *user_data) {
+    (void)result;
     (void)data;
     (void)size;
-    (void)arg;
+    (void)user_data;
 }
 
-int bs_get_blob(const blob_location_t *loc, bs_get_cb cb, void *arg) {
-    if (!g_bs || !loc) return -1;
-    if (!cb) cb = get_callback;
+int bs_get_blob(const blob_location_t *location, bs_get_callback callback, void *user_data) {
+    if (!g_blob_store || !location) return -1;
+    if (!callback) callback = get_callback;
 
-    if (loc->size == 0) {
-        cb(-1, NULL, 0, arg);
+    if (location->size == 0) {
+        callback(-1, NULL, 0, user_data);
         return -1;
     }
 
-    cb(0, NULL, loc->size, arg);
+    callback(0, NULL, location->size, user_data);
     return 0;
 }
 
-static void delete_callback(int rc, void *arg) {
-    (void)rc;
-    (void)arg;
+static void delete_callback(int result, void *user_data) {
+    (void)result;
+    (void)user_data;
 }
 
-int bs_delete_blob(blob_id_t id, bs_delete_cb cb, void *arg) {
-    if (!g_bs) return -1;
-    if (!cb) cb = delete_callback;
+int bs_delete_blob(blob_id_t id, bs_delete_callback callback, void *user_data) {
+    if (!g_blob_store) return -1;
+    if (!callback) callback = delete_callback;
 
-    blob_location_t loc;
-    if (cow_btree_lookup(g_bs->index, id, &loc) < 0) {
-        cb(-1, arg);
+    blob_location_t location;
+    if (cow_btree_lookup(g_blob_store->index, id, &location) < 0) {
+        callback(-1, user_data);
         return -1;
     }
 
-    if (journal_append_delete(g_bs->journal, id) < 0) {
-        cb(-1, arg);
+    if (journal_append_delete(g_blob_store->journal, id) < 0) {
+        callback(-1, user_data);
         return -1;
     }
 
-    cow_btree_delete(g_bs->index, id);
-    g_bs->dirty = 1;
+    cow_btree_delete(g_blob_store->index, id);
+    g_blob_store->is_dirty = 1;
 
-    cb(0, arg);
+    callback(0, user_data);
     return 0;
 }
 
 int bs_stat_blob(blob_id_t id, blob_state_t *state_out) {
-    if (!g_bs || !state_out) return -1;
+    if (!g_blob_store || !state_out) return -1;
 
-    blob_location_t loc;
-    if (cow_btree_lookup(g_bs->index, id, &loc) < 0) {
+    blob_location_t location;
+    if (cow_btree_lookup(g_blob_store->index, id, &location) < 0) {
         *state_out = BLOB_STATE_FREE;
         return 0;
     }
@@ -172,7 +172,7 @@ int bs_stat_blob(blob_id_t id, blob_state_t *state_out) {
     return 0;
 }
 
-int bs_gc_run(void) {
-    if (!g_bs) return -1;
+int bs_garbage_collection_run(void) {
+    if (!g_blob_store) return -1;
     return 0;
 }

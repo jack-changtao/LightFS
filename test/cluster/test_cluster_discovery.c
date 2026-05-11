@@ -7,11 +7,11 @@
 #include "lightfs/cluster/etcd_client.h"
 #include "mock_etcd.h"
 
-static int topo_cb_count = 0;
+static int topology_callback_count = 0;
 
-static void topo_change_cb(void *ctx) {
-    topo_cb_count++;
-    (void)ctx;
+static void test_topology_callback(void *user_data) {
+    topology_callback_count++;
+    (void)user_data;
 }
 
 void test_create_returns_non_null(void) {
@@ -22,10 +22,10 @@ void test_create_returns_non_null(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    service_discovery_t *sd = service_discovery_create(client);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(client);
+    assert(discovery != NULL);
 
-    service_discovery_destroy(sd);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(client);
     printf("create_returns_non_null test PASSED\n");
 }
@@ -38,9 +38,9 @@ void test_find_joined_gateway(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    cluster_node_config_t cfg = {
+    cluster_node_config_t config = {
         .node_id = 10,
-        .dc_id = 0,
+        .datacenter_id = 0,
         .host = "10.0.1.10",
         .gateway_port = 8080,
         .meta_port = 9090,
@@ -48,18 +48,18 @@ void test_find_joined_gateway(void) {
         .disk_count = 2,
         .total_disk_bytes = 2ULL * 1024 * 1024 * 1024 * 1024,
     };
-    cluster_node_t *node = cluster_node_join(client, &cfg);
+    cluster_node_t *node = cluster_node_join(client, &config);
     assert(node != NULL);
 
-    service_discovery_t *sd = service_discovery_create(client);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(client);
+    assert(discovery != NULL);
 
     service_endpoint_t endpoints[10];
-    int count = service_discovery_get_gateways(sd, endpoints, 10);
+    int count = service_discovery_get_gateways(discovery, endpoints, 10);
     assert(count >= 1);
 
     cluster_node_destroy(node);
-    service_discovery_destroy(sd);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(client);
     printf("find_joined_gateway test PASSED\n");
 }
@@ -72,14 +72,14 @@ void test_topology_watch_callback(void) {
     etcd_client_t *client = etcd_client_create("127.0.0.1", 2379);
     assert(client != NULL);
 
-    service_discovery_t *sd = service_discovery_create(client);
-    assert(sd != NULL);
+    service_discovery_t *discovery = service_discovery_create(client);
+    assert(discovery != NULL);
 
-    topo_cb_count = 0;
-    int rc = service_discovery_watch(sd, topo_change_cb, NULL);
-    assert(rc == 0);
+    topology_callback_count = 0;
+    int result = service_discovery_watch(discovery, test_topology_callback, NULL);
+    assert(result== 0);
 
-    service_discovery_destroy(sd);
+    service_discovery_destroy(discovery);
     etcd_client_destroy(client);
     printf("topology_watch_callback test PASSED\n");
 }

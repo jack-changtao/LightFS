@@ -3,10 +3,10 @@
 #include <string.h>
 
 typedef struct cache_entry {
-    char bucket[META_MAX_BUCKET_LEN + 1];
-    char key[META_MAX_KEY_LEN + 1];
+    char bucket[META_MAX_BUCKET_LENGTH + 1];
+    char key[META_MAX_KEY_LENGTH + 1];
     object_manifest_t manifest;
-    int valid;
+    int is_valid;
 } cache_entry_t;
 
 struct manifest_cache {
@@ -16,16 +16,16 @@ struct manifest_cache {
 };
 
 manifest_cache_t *manifest_cache_create(int max_entries) {
-    manifest_cache_t *c = calloc(1, sizeof(manifest_cache_t));
-    if (!c) return NULL;
+    manifest_cache_t *cache = calloc(1, sizeof(manifest_cache_t));
+    if (!cache) return NULL;
 
-    c->capacity = max_entries;
-    c->entries = calloc(max_entries, sizeof(cache_entry_t));
-    if (!c->entries) {
-        free(c);
+    cache->capacity = max_entries;
+    cache->entries = calloc(max_entries, sizeof(cache_entry_t));
+    if (!cache->entries) {
+        free(cache);
         return NULL;
     }
-    return c;
+    return cache;
 }
 
 void manifest_cache_destroy(manifest_cache_t *cache) {
@@ -35,10 +35,10 @@ void manifest_cache_destroy(manifest_cache_t *cache) {
 }
 
 static int make_index(const char *bucket, const char *key, int capacity) {
-    int h = 0;
-    while (*bucket) h = (h * 31 + *bucket++) & 0x7FFFFFFF;
-    while (*key) h = (h * 31 + *key++) & 0x7FFFFFFF;
-    return h % capacity;
+    int hash = 0;
+    while (*bucket) hash = (hash * 31 + *bucket++) & 0x7FFFFFFF;
+    while (*key) hash = (hash * 31 + *key++) & 0x7FFFFFFF;
+    return hash % capacity;
 }
 
 int manifest_cache_lookup(manifest_cache_t *cache,
@@ -46,15 +46,15 @@ int manifest_cache_lookup(manifest_cache_t *cache,
                            object_manifest_t *out) {
     if (!cache || !bucket || !key || !out) return -1;
 
-    int idx = make_index(bucket, key, cache->capacity);
+    int index = make_index(bucket, key, cache->capacity);
 
     for (int i = 0; i < cache->capacity; i++) {
-        int probe = (idx + i) % cache->capacity;
-        cache_entry_t *e = &cache->entries[probe];
-        if (!e->valid) return -1;
-        if (strcmp(e->bucket, bucket) == 0 &&
-            strcmp(e->key, key) == 0) {
-            *out = e->manifest;
+        int probe = (index + i) % cache->capacity;
+        cache_entry_t *entry = &cache->entries[probe];
+        if (!entry->is_valid) return -1;
+        if (strcmp(entry->bucket, bucket) == 0 &&
+            strcmp(entry->key, key) == 0) {
+            *out = entry->manifest;
             return 0;
         }
     }
@@ -66,38 +66,38 @@ void manifest_cache_insert(manifest_cache_t *cache,
                             const object_manifest_t *manifest) {
     if (!cache || !bucket || !key || !manifest) return;
 
-    int idx = make_index(bucket, key, cache->capacity);
+    int index = make_index(bucket, key, cache->capacity);
 
     for (int i = 0; i < cache->capacity; i++) {
-        int probe = (idx + i) % cache->capacity;
-        cache_entry_t *e = &cache->entries[probe];
-        if (e->valid && strcmp(e->bucket, bucket) == 0 &&
-            strcmp(e->key, key) == 0) {
-            e->manifest = *manifest;
+        int probe = (index + i) % cache->capacity;
+        cache_entry_t *entry = &cache->entries[probe];
+        if (entry->is_valid && strcmp(entry->bucket, bucket) == 0 &&
+            strcmp(entry->key, key) == 0) {
+            entry->manifest = *manifest;
             return;
         }
     }
 
     if (cache->count >= cache->capacity) {
-        int oldest_idx = 0;
+        int oldest_index = 0;
         for (int i = 0; i < cache->capacity; i++) {
-            if (!cache->entries[i].valid) {
-                oldest_idx = i;
+            if (!cache->entries[i].is_valid) {
+                oldest_index = i;
                 break;
             }
         }
-        cache->entries[oldest_idx].valid = 0;
+        cache->entries[oldest_index].is_valid = 0;
         cache->count--;
     }
 
     for (int i = 0; i < cache->capacity; i++) {
-        int probe = (idx + i) % cache->capacity;
-        cache_entry_t *e = &cache->entries[probe];
-        if (!e->valid) {
-            strncpy(e->bucket, bucket, sizeof(e->bucket) - 1);
-            strncpy(e->key, key, sizeof(e->key) - 1);
-            e->manifest = *manifest;
-            e->valid = 1;
+        int probe = (index + i) % cache->capacity;
+        cache_entry_t *entry = &cache->entries[probe];
+        if (!entry->is_valid) {
+            strncpy(entry->bucket, bucket, sizeof(entry->bucket) - 1);
+            strncpy(entry->key, key, sizeof(entry->key) - 1);
+            entry->manifest = *manifest;
+            entry->is_valid = 1;
             cache->count++;
             return;
         }
@@ -108,15 +108,15 @@ void manifest_cache_invalidate(manifest_cache_t *cache,
                                 const char *bucket, const char *key) {
     if (!cache || !bucket || !key) return;
 
-    int idx = make_index(bucket, key, cache->capacity);
+    int index = make_index(bucket, key, cache->capacity);
 
     for (int i = 0; i < cache->capacity; i++) {
-        int probe = (idx + i) % cache->capacity;
-        cache_entry_t *e = &cache->entries[probe];
-        if (!e->valid) return;
-        if (strcmp(e->bucket, bucket) == 0 &&
-            strcmp(e->key, key) == 0) {
-            e->valid = 0;
+        int probe = (index + i) % cache->capacity;
+        cache_entry_t *entry = &cache->entries[probe];
+        if (!entry->is_valid) return;
+        if (strcmp(entry->bucket, bucket) == 0 &&
+            strcmp(entry->key, key) == 0) {
+            entry->is_valid = 0;
             cache->count--;
             return;
         }

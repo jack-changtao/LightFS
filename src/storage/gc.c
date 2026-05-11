@@ -2,42 +2,42 @@
 #include "segment.h"
 #include <stdlib.h>
 
-int gc_init(gc_context_t *ctx, segment_manager_t *mgr) {
-    if (!ctx || !mgr) return -1;
+int garbage_collection_initialize(garbage_collection_context_t *context, segment_manager_t *manager) {
+    if (!context || !manager) return -1;
 
-    ctx->mgr = mgr;
-    ctx->threshold = 20;
-    ctx->last_run = 0;
+    context->manager = manager;
+    context->threshold = 20;
+    context->last_run = 0;
     return 0;
 }
 
-void gc_destroy(gc_context_t *ctx) {
-    (void)ctx;
+void garbage_collection_destroy(garbage_collection_context_t *context) {
+    (void)context;
 }
 
-int gc_should_run(gc_context_t *ctx) {
-    if (!ctx) return 0;
+int garbage_collection_should_run(garbage_collection_context_t *context) {
+    if (!context) return 0;
 
-    for (uint32_t i = 0; i < ctx->mgr->count; i++) {
-        segment_t *seg = ctx->mgr->segments[i];
-        if (!seg || seg->state != SEG_SEALED) continue;
+    for (uint32_t i = 0; i < context->manager->count; i++) {
+        segment_t *segment = context->manager->segments[i];
+        if (!segment || segment->state != SEGMENT_SEALED) continue;
 
         int liveness = 0;
-        if (seg->size > 0) {
-            liveness = (int)((seg->live_bytes * 100) / seg->size);
+        if (segment->size > 0) {
+            liveness = (int)((segment->live_bytes * 100) / segment->size);
         }
 
-        if (liveness < (int)ctx->threshold) {
+        if (liveness < (int)context->threshold) {
             return 1;
         }
     }
     return 0;
 }
 
-int gc_run(gc_context_t *ctx) {
-    if (!ctx) return -1;
+int garbage_collection_run(garbage_collection_context_t *context) {
+    if (!context) return -1;
 
-    segment_t *victim = segment_find_gc_victim(ctx->mgr, ctx->threshold, SEG_TYPE_DATA);
+    segment_t *victim = segment_find_garbage_collection_victim(context->manager, context->threshold, SEGMENT_TYPE_DATA);
     if (!victim) return 0;
 
     segment_start_cleaning(victim);
