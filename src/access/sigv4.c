@@ -28,7 +28,7 @@ sigv4_result_t sigv4_validate(const char *auth_header,
     (void)method; (void)uri; (void)host; (void)date;
     (void)body; (void)body_length; (void)sig_start;
 
-    return SIGV4_ERROR_OK;
+    return SIGV4_OK;
 }
 
 const char *sigv4_extract_access_key(const char *auth_header) {

@@ -1,15 +1,9 @@
 #ifndef LIGHTFS_ACCESS_SERVER_H
 #define LIGHTFS_ACCESS_SERVER_H
 
-#include <stdint.h>
+#include "lightfs/access/http_server.h"
 
-typedef struct {
-    const char *listen_host;
-    uint16_t listen_port;
-    uint32_t max_request_body;
-} access_server_config_t;
-
-int access_server_start(const access_server_config_t *config);
+int  access_server_start(const http_server_config_t *config);
 void access_server_stop(void);
 
 #endif /* LIGHTFS_ACCESS_SERVER_H */
