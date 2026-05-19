@@ -14,15 +14,6 @@
 #include "engine_log.h"
 #include "segment/segment.h"
 #include "superblock.h"
-#include "lightfs/storage_server/storage_server.h"
-#include "transport_tcp.h"
-
-struct rpc_stop_ctx {
-  storage_server_t *srv;
-  struct nrpc_transport *transport;
-};
-
-static void rpc_stop_cleanup(void *arg);
 
 struct zero_seg_wait { volatile int done; int err; };
 
@@ -277,18 +268,6 @@ storage_engine_stop(storage_engine_ctx_t *ctx)
 	if (ctx == NULL) {
 		return;
 	}
-	if (ctx->rpc_thread != NULL && ctx->storage_server != NULL) {
-		struct rpc_stop_ctx *sc = malloc(sizeof(*sc));
-		if (sc) {
-			sc->srv = ctx->storage_server;
-			sc->transport = ctx->rpc_transport;
-			spdk_thread_send_msg(ctx->rpc_thread, rpc_stop_cleanup, sc);
-		}
-		ctx->rpc_thread = NULL;
-		ctx->storage_server = NULL;
-		ctx->rpc_transport = NULL;
-	}
-
 	if (ctx->obj_manager != NULL) {
 		obj_manager_close(ctx->obj_manager);
 		ctx->obj_manager = NULL;
@@ -379,18 +358,6 @@ storage_engine_stop_async(storage_engine_ctx_t *ctx,
 	sctx->cb = cb;
 	sctx->cb_arg = cb_arg;
 	sctx->cb_thread = cb_thread ? cb_thread : spdk_get_thread();
-
-	if (ctx->rpc_thread != NULL && ctx->storage_server != NULL) {
-		struct rpc_stop_ctx *sc = malloc(sizeof(*sc));
-		if (sc) {
-			sc->srv = ctx->storage_server;
-			sc->transport = ctx->rpc_transport;
-			spdk_thread_send_msg(ctx->rpc_thread, rpc_stop_cleanup, sc);
-		}
-		ctx->storage_server = NULL;
-		ctx->rpc_transport = NULL;
-		ctx->rpc_thread = NULL;
-	}
 
 	if (ctx->obj_manager != NULL) {
 		obj_manager_close(ctx->obj_manager);
@@ -486,30 +453,6 @@ storage_engine_parse_argv(int argc, char *argv[], storage_engine_ctx_t *out_ctx)
 	return 0;
 }
 
-static void
-rpc_stop_cleanup(void *arg)
-{
-  struct rpc_stop_ctx *c = arg;
-  storage_server_destroy(c->srv);
-  nrpc_tcp_transport_free(c->transport);
-  spdk_thread_exit(spdk_get_thread());
-  free(c);
-}
-
-static int
-storage_server_poller_fn(void *arg)
-{
-  storage_server_poll((storage_server_t *)arg);
-  return SPDK_POLLER_BUSY;
-}
-
-static void
-rpc_thread_register_poller(void *arg)
-{
-  storage_server_t *srv = arg;
-  spdk_poller_register(storage_server_poller_fn, srv, 0);
-}
-
 static int
 validate_core_affinity(storage_engine_ctx_t *ctx)
 {
@@ -565,22 +508,23 @@ validate_core_affinity(storage_engine_ctx_t *ctx)
 	}
 
 	/* Validate RPC core */
-	if (ctx->rpc_core_index >= 0) {
-		if (!spdk_cpuset_get_cpu(reactor_mask, ctx->rpc_core_index)) {
+	if (cfg->rpc.port > 0) {
+		int rpc_core = cfg->rpc.core_index;
+		if (!spdk_cpuset_get_cpu(reactor_mask, rpc_core)) {
 			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-				"RPC core %d not in reactor mask", ctx->rpc_core_index);
+				"RPC core %d not in reactor mask", rpc_core);
 			return -1;
 		}
 		for (int i = 0; i < cfg->shard.core_map_len; i++) {
-			if (cfg->shard.core_map[i] == ctx->rpc_core_index) {
+			if (cfg->shard.core_map[i] == rpc_core) {
 				ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-					"RPC core %d conflicts with shard %d", ctx->rpc_core_index, i);
+					"RPC core %d conflicts with shard %d", rpc_core, i);
 				return -1;
 			}
 		}
-		if (cfg->shard.bg_core == ctx->rpc_core_index) {
+		if (cfg->shard.bg_core == rpc_core) {
 			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-				"RPC core %d conflicts with bg core", ctx->rpc_core_index);
+				"RPC core %d conflicts with bg core", rpc_core);
 			return -1;
 		}
 	}
@@ -592,143 +536,73 @@ validate_core_affinity(storage_engine_ctx_t *ctx)
 	return 0;
 }
 
-void
-storage_engine_start(void *arg)
+int
+storage_engine_init(storage_engine_ctx_t *ctx)
 {
-	storage_engine_ctx_t *ctx = arg;
-	config_t *cfg;
-	int num_shards;
+  config_t *cfg;
+  int num_shards;
 
-	if (load_config(ctx->config_file) != 0) {
-		ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-			 "Failed to load application config (default ./conf/config.json)");
-		goto cleanup;
-	}
-	cfg = get_config();
+  if (load_config(ctx->config_file) != 0) {
+    ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
+       "Failed to load application config (default ./conf/config.json)");
+    return -1;
+  }
+  cfg = get_config();
 
-	if (init_spdk_bdev() != 0) {
-		ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-			 "init_spdk_bdev failed (segment I/O requires backing bdev)");
-		goto cleanup;
-	}
-	segment_set_bdev(get_bdev());
+  if (init_spdk_bdev() != 0) {
+    ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
+       "init_spdk_bdev failed (segment I/O requires backing bdev)");
+    return -1;
+  }
+  segment_set_bdev(get_bdev());
 
-	if (ctx->force_mkfs) {
-		if (storage_engine_mkfs_volume(ctx, cfg, &num_shards) != 0) {
-			goto cleanup;
-		}
-		ENG_LOG_INFO(ENGINE_LOG_MOD_CORE, "mkfs finished successfully; exiting.");
-		storage_engine_stop(ctx);
-		spdk_app_stop(0);
-		return;
-	}
+  if (ctx->force_mkfs) {
+    if (storage_engine_mkfs_volume(ctx, cfg, &num_shards) != 0) {
+      return -1;
+    }
+    ENG_LOG_INFO(ENGINE_LOG_MOD_CORE, "mkfs finished successfully; exiting.");
+    storage_engine_stop(ctx);
+    return 0;
+  }
 
-	{
-		superblock_v1_t sb = {0};
+  {
+    superblock_v1_t sb = {0};
 
-		if (storage_engine_mount_volume(ctx, &num_shards, &sb) != 0) {
-			goto cleanup;
-		}
+    if (storage_engine_mount_volume(ctx, &num_shards, &sb) != 0) {
+      return -1;
+    }
 
-		if (validate_core_affinity(ctx) != 0) {
-			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Core affinity validation failed");
-			goto cleanup;
-		}
+    if (validate_core_affinity(ctx) != 0) {
+      ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Core affinity validation failed");
+      return -1;
+    }
 
-		if (shard_manager_init(&ctx->shard_manager, num_shards, cfg->shard.core_map) != 0) {
-			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to initialize shard manager");
-			goto cleanup;
-		}
+    if (shard_manager_init(&ctx->shard_manager, num_shards, cfg->shard.core_map) != 0) {
+      ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to initialize shard manager");
+      return -1;
+    }
 
-		if (shard_subsystems_init(&ctx->shard_manager,
-					  &ctx->allocator, &sb)
-		    != 0) {
-			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-				 "Failed to initialize per-shard subsystems");
-			goto cleanup;
-		}
-		if (shard_manager_recover_on_mount(&ctx->shard_manager,
-					   &ctx->allocator)
-		    != 0) {
-			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-				 "Failed to recover per-shard state from mount path");
-			goto cleanup;
-		}
-	}
+    if (shard_subsystems_init(&ctx->shard_manager, &ctx->allocator, &sb) != 0) {
+      ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to initialize per-shard subsystems");
+      return -1;
+    }
+    if (shard_manager_recover_on_mount(&ctx->shard_manager, &ctx->allocator) != 0) {
+      ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to recover per-shard state from mount path");
+      return -1;
+    }
+  }
 
-	if (obj_manager_init(&ctx->obj_manager, &ctx->shard_manager) != 0) {
-		ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to initialize obj manager");
-		goto cleanup;
-	}
+  if (obj_manager_init(&ctx->obj_manager, &ctx->shard_manager) != 0) {
+    ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to initialize obj manager");
+    return -1;
+  }
 
-	/* Create RPC thread and storage server if rpc_port is configured */
-	if (ctx->rpc_port > 0) {
-		char thread_name[32];
-		snprintf(thread_name, sizeof(thread_name), "rpc_thread");
-		struct spdk_cpuset *rpc_cpuset = spdk_cpuset_alloc();
-		spdk_cpuset_zero(rpc_cpuset);
-		spdk_cpuset_set_cpu(rpc_cpuset, ctx->rpc_core_index, true);
-		struct spdk_thread *rpc_thread = spdk_thread_create(thread_name, rpc_cpuset);
-		spdk_cpuset_free(rpc_cpuset);
-
-		if (rpc_thread) {
-			struct nrpc_transport *transport = nrpc_tcp_transport_alloc();
-			if (!transport) {
-				ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to create TCP transport for RPC server");
-				spdk_thread_exit(rpc_thread);
-				spdk_thread_destroy(rpc_thread);
-				goto cleanup;
-			}
-
-			storage_server_t *srv = storage_server_create(rpc_thread, transport,
-			                                               ctx->obj_manager);
-			if (!srv) {
-				ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to create storage server");
-				nrpc_tcp_transport_free(transport);
-				spdk_thread_exit(rpc_thread);
-				spdk_thread_destroy(rpc_thread);
-				goto cleanup;
-			}
-
-			if (storage_server_start(srv, "0.0.0.0", (uint16_t)ctx->rpc_port) == 0) {
-				SPDK_NOTICELOG("Storage RPC server started on port %d, core %d\n",
-				               ctx->rpc_port, ctx->rpc_core_index);
-				ctx->storage_server = srv;
-				ctx->rpc_transport = transport;
-				ctx->rpc_thread = rpc_thread;
-				spdk_thread_send_msg(rpc_thread, rpc_thread_register_poller, srv);
-			} else {
-				ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to start storage server on port %d",
-				              ctx->rpc_port);
-				storage_server_destroy(srv);
-				nrpc_tcp_transport_free(transport);
-				spdk_thread_exit(rpc_thread);
-				spdk_thread_destroy(rpc_thread);
-				goto cleanup;
-			}
-		}
-	}
-
-	if (ctx->ready_fn == NULL) {
-		ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE,
-			 "storage_engine: ready_fn is NULL after mount init");
-		goto cleanup;
-	}
-
-	{
-		struct spdk_event *event =
-		    spdk_event_allocate(0, ctx->ready_fn, ctx->ready_arg1, ctx->ready_arg2);
-
-		if (!event) {
-			ENG_LOG_ERROR(ENGINE_LOG_MOD_CORE, "Failed to allocate event");
-			goto cleanup;
-		}
-		spdk_event_call(event);
-	}
-
-	return;
-
-cleanup:
-	storage_engine_stop(ctx);
-	spdk_app_stop(-1);
+  return 0;
 }
+
+obj_manager_t *
+storage_engine_get_obj_manager(storage_engine_ctx_t *ctx)
+{
+  return ctx ? ctx->obj_manager : NULL;
+}
+
