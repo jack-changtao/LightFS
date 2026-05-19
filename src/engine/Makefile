@@ -3,13 +3,13 @@
 #  All rights reserved.
 #
 SPDK_ROOT_DIR ?= $(abspath $(HOME)/spdk)
-include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
-include $(SPDK_ROOT_DIR)/mk/spdk.modules.mk
 
-# Build static library instead of app binary
-LIB := storage_engine
+# Include SPDK common for compiler flags and config
+include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
 
 LIGHTFS_ROOT := $(shell cd $(CURDIR)/../.. && pwd)
+
+LIB := libstorage_engine.a
 
 C_SRCS := \
 	src/storage_engine.c \
@@ -31,9 +31,22 @@ C_SRCS := \
 	src/checkpoint.c \
 	src/config.c
 
-include $(SPDK_ROOT_DIR)/mk/spdk.lib.mk
-
 CFLAGS += -I$(abspath .)/src
 CFLAGS += -I$(abspath .)/log
 CFLAGS += -I$(LIGHTFS_ROOT)/include
 CFLAGS += -I$(LIGHTFS_ROOT)/src
+
+OBJS := $(C_SRCS:.c=.o)
+
+.PHONY: all clean
+
+all: $(LIB)
+
+$(LIB): $(OBJS)
+	$(Q)ar rcs $@ $^
+
+%.o: %.c
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	$(Q)rm -f $(LIB) $(OBJS)
