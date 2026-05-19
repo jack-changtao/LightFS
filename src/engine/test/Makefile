@@ -8,7 +8,7 @@ include $(SPDK_ROOT_DIR)/mk/spdk.modules.mk
 
 APP := storage_engine_test
 
-LIGHTFS_ROOT := $(shell cd $(CURDIR)/../.. && pwd)
+LIGHTFS_ROOT := $(shell cd $(CURDIR)/../../.. && pwd)
 ENGINE_DIR  := $(LIGHTFS_ROOT)/src/engine
 
 C_SRCS := test_main.c
