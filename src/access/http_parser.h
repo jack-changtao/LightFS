@@ -36,6 +36,7 @@ typedef struct http_parser_ctx {
     bool parsing_header_value;
     bool error_flag;
     llhttp_errno_t last_error;
+    uint32_t max_body_size;                         /* enforced in on_body */
 } http_parser_ctx_t;
 
 /* Initialize parser context (call once per connection) */

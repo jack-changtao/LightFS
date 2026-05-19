@@ -1,9 +1,11 @@
 # test/access/Makefile
+SPDK_ROOT_DIR ?= $(HOME)/spdk
+
 CC ?= gcc
 CFLAGS := -Wall -Wextra -std=c11 -g -I../../include -I../../src/access \
-          -I/root/spdk/include
+          -I$(SPDK_ROOT_DIR)/include
 LDFLAGS := -lllhttp -lm
-LDFLAGS_SPDK := -L/root/spdk/build/lib -lspdk -lpthread -lllhttp -lm
+LDFLAGS_SPDK := -L$(SPDK_ROOT_DIR)/build/lib -lspdk -lpthread -lllhttp -lm
 
 SRCDIR = ../../src/access
 MOCKDIR = ../mocks

@@ -1,6 +1,12 @@
 #ifndef MOCK_SPDK_SOCK_H
 #define MOCK_SPDK_SOCK_H
 
+/*
+ * SPDK sock mock layer for unit testing without linking -lspdk.
+ * WARNING: include from only ONE .c file per test binary.
+ * These definitions replace spdk_sock_* symbols at link time.
+ */
+
 #include <spdk/sock.h>
 #include <spdk/queue.h>
 #include <stdlib.h>

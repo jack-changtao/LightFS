@@ -10,7 +10,6 @@
 S(HTTP_1_1,     "HTTP/1.1 ");
 S(CRLF,         "\r\n");
 S(CT_XML,       "Content-Type: application/xml\r\n");
-S(CT_OCTET,     "Content-Type: application/octet-stream\r\n");
 S(CONN_KA,      "Connection: keep-alive\r\n");
 S(CONN_CLOSE,   "Connection: close\r\n");
 
@@ -27,9 +26,11 @@ static const struct iovec status_table[] = {
     [503] = { .iov_base = "503 Service Unavailable\r\n", .iov_len = 25 },
 };
 
-/* scratch buffers for dynamic header values (one per call, not reentrant) */
+/* scratch buffers for dynamic header values.
+   Safe under SPDK single-threaded reactor model. */
 static char etag_buf[S3_MAX_HEADER_LENGTH + 16];
 static char cl_buf[64];
+static char ct_buf[S3_MAX_HEADER_LENGTH + 32];
 
 /* ── public ──────────────────────────────────────────────────────── */
 
@@ -51,7 +52,9 @@ int http_response_serialize(const s3_response_t *response,
     /* Content-Type */
     if (max_iov - n < 1) return -1;
     if (response->content_type && response->content_type[0]) {
-        iov[n++] = IOV_CT_OCTET;
+        int w = snprintf(ct_buf, sizeof(ct_buf), "Content-Type: %s\r\n",
+                         response->content_type);
+        iov[n++] = (struct iovec){ .iov_base = ct_buf, .iov_len = (size_t)w };
     } else if (response->body && response->body_length > 0) {
         iov[n++] = IOV_CT_XML;
     }

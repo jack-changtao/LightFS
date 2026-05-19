@@ -7,14 +7,17 @@
 
 static int on_message_begin(llhttp_t *parser) {
     http_parser_ctx_t *ctx = (http_parser_ctx_t *)parser->data;
-    memset(&ctx->request, 0, sizeof(ctx->request));
-    ctx->header_count = 0;
-    ctx->parsing_header_value = false;
-    ctx->error_flag = false;
+    /* zero only HTTP-level fields; s3_request_t is populated by callbacks/s3_route_parse */
+    memset(ctx->request.method, 0, sizeof(ctx->request.method));
+    memset(ctx->request.uri, 0, sizeof(ctx->request.uri));
     ctx->request.body = NULL;
     ctx->request.body_len = 0;
     ctx->request.body_capacity = 0;
     ctx->request.complete = false;
+    ctx->request.keep_alive = false;
+    ctx->header_count = 0;
+    ctx->parsing_header_value = false;
+    ctx->error_flag = false;
     return 0;
 }
 
@@ -89,12 +92,23 @@ static int on_headers_complete(llhttp_t *parser) {
 
 static int on_body(llhttp_t *parser, const char *data, size_t len) {
     http_parser_ctx_t *ctx = (http_parser_ctx_t *)parser->data;
+
+    if (ctx->max_body_size > 0 &&
+        ctx->request.body_len + len > ctx->max_body_size) {
+        ctx->error_flag = true;
+        ctx->last_error = HPE_USER;
+        return -1;
+    }
+
     if (!ctx->request.body || ctx->request.body_len + len > ctx->request.body_capacity) {
         size_t new_cap = ctx->request.body_capacity ? ctx->request.body_capacity * 2
                                                      : HTTP_DEFAULT_BODY_BUF;
         while (ctx->request.body_len + len > new_cap) new_cap *= 2;
         char *new_buf = realloc(ctx->request.body, new_cap);
-        if (!new_buf) return -1;
+        if (!new_buf) {
+            ctx->error_flag = true;
+            return -1;
+        }
         ctx->request.body = new_buf;
         ctx->request.body_capacity = (uint32_t)new_cap;
     }
@@ -169,7 +183,8 @@ int http_parser_feed(http_parser_ctx_t *ctx, const uint8_t *data, size_t len) {
     if (pos) {
         return (int)(pos - (const char *)data);
     }
-    return (int)len;
+    /* HPE_OK with no position means parser is waiting for more data */
+    return 0;
 }
 
 void http_parser_reset(http_parser_ctx_t *ctx) {

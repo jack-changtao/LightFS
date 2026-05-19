@@ -1,7 +1,9 @@
 # src/access/Makefile
+SPDK_ROOT_DIR ?= $(HOME)/spdk
+
 CC ?= gcc
-CFLAGS := -Wall -Wextra -std=c11 -g -I../../include -I/root/spdk/include
-LDFLAGS := -L/root/spdk/build/lib -lspdk -lpthread -lllhttp
+CFLAGS := -Wall -Wextra -std=c11 -g -I../../include -I$(SPDK_ROOT_DIR)/include
+LDFLAGS := -L$(SPDK_ROOT_DIR)/build/lib -lspdk -lpthread -lllhttp
 
 SRCS = sigv4.c access_routes.c access_handlers.c s3_xml.c \
        http_parser.c http_response.c http_server.c access_server.c

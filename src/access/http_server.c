@@ -26,6 +26,7 @@ static uint64_t now_ms(void) {
 }
 
 static void fill_error_response(s3_response_t *resp, uint32_t status, const char *code, const char *msg) {
+    /* Safe under SPDK single-threaded reactor model */
     static char err_buf[512];
     memset(resp, 0, sizeof(*resp));
     resp->http_status = status;
@@ -71,14 +72,8 @@ static void conn_write_response(http_conn_t *conn, const s3_response_t *resp) {
 
 http_conn_t *http_conn_accept(http_server_t *server, struct spdk_sock *sock) {
     if (server->conn_count >= server->max_connections) {
-        http_conn_t *reject = calloc(1, sizeof(http_conn_t));
-        if (!reject) return NULL;
-        reject->sock = sock;
-        reject->server = server;
-        reject->state = CONN_CLOSING;
-        s3_response_t resp;
-        fill_error_response(&resp, 503, "ServiceUnavailable", "Too many connections");
-        conn_write_response(reject, &resp);
+        /* Over capacity: close immediately without allocating a connection */
+        spdk_sock_close(&sock);
         return NULL;
     }
 
@@ -96,6 +91,7 @@ http_conn_t *http_conn_accept(http_server_t *server, struct spdk_sock *sock) {
     conn->state = CONN_READING;
     conn->last_active_ts = now_ms();
     http_parser_init(&conn->parser_ctx);
+    conn->parser_ctx.max_body_size = server->max_request_body;
 
     spdk_sock_group_add_sock(server->group, sock, NULL, conn);
 
@@ -185,7 +181,13 @@ void http_conn_dispatch(http_conn_t *conn) {
         result = s3_handler_put(&req->s3, req->body, req->body_len, &response);
         break;
     case S3_OPERATION_GET_OBJECT:
+    case S3_OPERATION_HEAD_OBJECT:
         result = s3_handler_get(&req->s3, &response);
+        /* HEAD returns headers only, no body */
+        if (req->s3.operation == S3_OPERATION_HEAD_OBJECT) {
+            response.body = NULL;
+            response.body_length = 0;
+        }
         break;
     case S3_OPERATION_DELETE_OBJECT:
         result = s3_handler_delete(&req->s3, &response);
