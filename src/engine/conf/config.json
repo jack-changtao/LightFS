@@ -1,0 +1,41 @@
+{
+  "spdk": {
+    "json_config_file": "hdd.json",
+    "bdev": {
+      "name": "MyHDD"
+    }
+  },
+  "segment": {
+    "max_segments": 10000,
+    "segment_size": 4194304
+  },
+  "wal": {
+    "ring_buffer_size": 1048576
+  },
+  "gc": {
+    "enabled": true,
+    "threshold": 0.8,
+    "interval": 300,
+    "segment_scan_batch": 64,
+    "reschedule_delay_us": 100000
+  },
+  "checkpoint": {
+    "enabled": true,
+    "interval": 60
+  },
+  "log": {
+    "mode": "console",
+    "file_path": "storage_engine.log",
+    "default_level": 1
+  },
+  "shard": {
+    "num_shards": 4
+  },
+  "rpc": {
+    "port": 8080,
+    "core_index": 5
+  },
+  "debug": {
+    "manifest_small_checkpoint": false
+  }
+}
