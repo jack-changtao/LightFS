@@ -5,7 +5,6 @@
 #include "lightfs/storage_server/storage_server.h"
 #include "client.h"
 #include "transport_tcp.h"
-#include "spdk/thread.h"
 
 #define STORAGE_CLIENT_DEFAULT_TIMEOUT_MS 5000
 
@@ -26,7 +25,6 @@ typedef struct {
 } storage_pending_call_t;
 
 struct storage_client {
-  struct spdk_thread *thread;
   struct nrpc_client *rpc_client;
   int                 endpoint_idx;
   bool                is_connected;

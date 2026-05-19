@@ -316,6 +316,11 @@ collect_shard_statfs(void *arg)
   int rem = __sync_sub_and_fetch(&agg->remaining, 1);
   if (rem == 0) {
     reply_msg_t *msg = calloc(1, sizeof(*msg));
+    if (!msg) {
+      free(agg);
+      free(sctx);
+      return;
+    }
     msg->rpc_server = agg->rpc_server;
     msg->request_id = agg->request_id;
     msg->rpc_thread = agg->rpc_thread;
@@ -323,10 +328,12 @@ collect_shard_statfs(void *arg)
     msg->opcode = RPC_OP_STATFS;
 
     uint8_t *extra = malloc(16);
-    memcpy(extra, &agg->total_size, 8);
-    memcpy(extra + 8, &agg->used_size, 8);
-    msg->extra_data = extra;
-    msg->extra_len = 16;
+    if (extra) {
+      memcpy(extra, &agg->total_size, 8);
+      memcpy(extra + 8, &agg->used_size, 8);
+      msg->extra_data = extra;
+      msg->extra_len = 16;
+    }
 
     spdk_thread_send_msg(agg->rpc_thread, send_deferred_reply, msg);
     free(agg);
@@ -351,18 +358,52 @@ rpc_handler_statfs(void *ctx, uint32_t opcode, const void *req, uint32_t req_len
   shard_manager_t *shard_mgr = obj_manager_get_shard_manager(srv->obj_mgr);
 
   statfs_aggregator_t *agg = calloc(1, sizeof(*agg));
+  if (!agg) {
+    *out_status = NRPC_STATUS_INTERNAL;
+    *out_body_len = 0;
+    return 0;
+  }
   agg->rpc_server = srv->nrpc;
   agg->request_id = nrpc_server_get_request_id(srv->nrpc);
   agg->rpc_thread = srv->rpc_thread;
   agg->remaining = num_shards;
 
-  for (int i = 0; i < num_shards; i++) {
-    statfs_shard_ctx_t *sctx = calloc(1, sizeof(*sctx));
-    sctx->agg = agg;
-    sctx->shard = &shard_mgr->shards[i];
-    spdk_thread_send_msg(shard_mgr->shards[i].thread,
-                          collect_shard_statfs, sctx);
+  /* Pre-allocate all shard contexts before dispatching */
+  statfs_shard_ctx_t **ctxs = calloc((size_t)num_shards, sizeof(*ctxs));
+  if (!ctxs) {
+    free(agg);
+    *out_status = NRPC_STATUS_INTERNAL;
+    *out_body_len = 0;
+    return 0;
   }
+
+  bool alloc_failed = false;
+  for (int i = 0; i < num_shards; i++) {
+    ctxs[i] = calloc(1, sizeof(statfs_shard_ctx_t));
+    if (!ctxs[i]) {
+      alloc_failed = true;
+      break;
+    }
+  }
+
+  if (alloc_failed) {
+    for (int i = 0; i < num_shards; i++) {
+      free(ctxs[i]);
+    }
+    free(ctxs);
+    free(agg);
+    *out_status = NRPC_STATUS_INTERNAL;
+    *out_body_len = 0;
+    return 0;
+  }
+
+  for (int i = 0; i < num_shards; i++) {
+    ctxs[i]->agg = agg;
+    ctxs[i]->shard = &shard_mgr->shards[i];
+    spdk_thread_send_msg(shard_mgr->shards[i].thread,
+                          collect_shard_statfs, ctxs[i]);
+  }
+  free(ctxs);
 
   return NRPC_HANDLER_DEFERRED;
 }

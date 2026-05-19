@@ -14,7 +14,6 @@ storage_server_create(struct spdk_thread *rpc_thread,
   srv->rpc_thread = rpc_thread;
   srv->transport = transport;
   srv->obj_mgr = obj_mgr;
-  srv->started = false;
 
   srv->nrpc = nrpc_server_create(rpc_thread, transport);
   if (!srv->nrpc) {
@@ -41,9 +40,6 @@ storage_server_start(storage_server_t *srv, const char *host, uint16_t port)
   srv->port = port;
 
   int rc = nrpc_server_listen(srv->nrpc, host, port);
-  if (rc == 0) {
-    srv->started = true;
-  }
   return rc;
 }
 

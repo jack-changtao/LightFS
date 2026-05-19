@@ -3,11 +3,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_DEFERRED_BODY (8 + NRPC_MAX_BODY)
+
 void
 send_deferred_reply(void *arg)
 {
   reply_msg_t *msg = arg;
-  uint8_t body[NRPC_MAX_BODY];
+  uint32_t cap = (msg->opcode == RPC_OP_READ)  ? (8 + msg->extra_len) :
+                 (msg->opcode == RPC_OP_STATFS) ? 20 :
+                                                  4;
+  uint8_t *body = malloc(cap);
+  if (!body) {
+    free(msg->extra_data);
+    free(msg);
+    return;
+  }
+
   uint32_t body_len = 0;
 
   switch (msg->opcode) {
@@ -44,8 +55,15 @@ send_deferred_reply(void *arg)
   }
   }
 
-  nrpc_server_send_response(msg->rpc_server, msg->request_id,
-                             NRPC_STATUS_OK, body, body_len);
+  int rc = nrpc_server_send_response(msg->rpc_server, msg->request_id,
+                                      NRPC_STATUS_OK, body, body_len);
+  free(body);
+
+  if (rc == -EBUSY) {
+    /* Server has a send in flight; re-queue to retry after it completes */
+    spdk_thread_send_msg(msg->rpc_thread, send_deferred_reply, msg);
+    return;
+  }
 
   free(msg->extra_data);
   free(msg);
@@ -57,6 +75,11 @@ bridge_callback(void *user_ctx, io_result_t result)
   bridge_ctx_t *bctx = user_ctx;
 
   reply_msg_t *msg = calloc(1, sizeof(*msg));
+  if (!msg) {
+    free(bctx->extra_data);
+    free(bctx);
+    return;
+  }
   msg->rpc_server = bctx->rpc_server;
   msg->request_id = bctx->request_id;
   msg->rpc_thread  = bctx->rpc_thread;

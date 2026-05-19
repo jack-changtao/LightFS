@@ -88,7 +88,6 @@ storage_client_create(struct spdk_thread *thread, const char *host, uint16_t por
   if (!c) {
     return NULL;
   }
-  c->thread = thread;
   c->host = strdup(host);
   c->port = port;
   c->is_connected = false;

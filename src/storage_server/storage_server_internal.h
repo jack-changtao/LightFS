@@ -54,7 +54,6 @@ struct storage_server {
   obj_manager_t         *obj_mgr;
   char                  *host;
   uint16_t               port;
-  bool                   started;
 };
 
 /* rpc_handler.c */
