@@ -4,15 +4,15 @@
 #include <stdint.h>
 
 typedef struct {
-    int is_put_called;
-    int is_get_called;
-    int is_delete_called;
-    int is_list_called;
-    uint32_t last_status;
-    const char *last_bucket;
-    const char *last_key;
-    const void *last_data;
-    uint32_t last_data_length;
+  int is_put_called;
+  int is_get_called;
+  int is_delete_called;
+  int is_list_called;
+  uint32_t last_status;
+  const char *last_bucket;
+  const char *last_key;
+  const void *last_data;
+  uint32_t last_data_length;
 } mock_gateway_state_t;
 
 mock_gateway_state_t *mock_gateway_state(void);

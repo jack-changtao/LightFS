@@ -12,16 +12,16 @@ typedef uint64_t btree_key_t;
 #define SEGMENT_ID_INVALID ((segment_id_t)0)
 
 typedef struct {
-    segment_id_t segment_id;
-    uint64_t offset;
-    uint32_t size;
-    uint32_t checksum;
+  segment_id_t segment_id;
+  uint64_t offset;
+  uint32_t size;
+  uint32_t checksum;
 } blob_location_t;
 
 typedef enum {
-    BLOB_STATE_FREE = 0,
-    BLOB_STATE_ACTIVE,
-    BLOB_STATE_DELETED,
+  BLOB_STATE_FREE = 0,
+  BLOB_STATE_ACTIVE,
+  BLOB_STATE_DELETED,
 } blob_state_t;
 
 #endif /* LIGHTFS_BS_TYPES_H */

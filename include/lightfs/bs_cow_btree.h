@@ -13,10 +13,10 @@ cow_btree_t *cow_btree_create(void);
 void cow_btree_destroy(cow_btree_t *tree);
 
 int cow_btree_insert(cow_btree_t *tree, btree_key_t key,
-                     const blob_location_t *value);
+          const blob_location_t *value);
 
 int cow_btree_lookup(cow_btree_t *tree, btree_key_t key,
-                     blob_location_t *value_out);
+          blob_location_t *value_out);
 
 int cow_btree_delete(cow_btree_t *tree, btree_key_t key);
 

@@ -7,15 +7,15 @@
 #define REPLICATION_QUEUE_MAX 1024
 
 typedef struct {
-    object_manifest_t manifest;
-    int is_pending;
+  object_manifest_t manifest;
+  int is_pending;
 } replication_entry_t;
 
 struct replication_engine {
-    replication_peer_t peers[REPLICATION_MAX_PEERS];
-    int peer_count;
-    replication_entry_t queue[REPLICATION_QUEUE_MAX];
-    int queue_count;
+  replication_peer_t peers[REPLICATION_MAX_PEERS];
+  int peer_count;
+  replication_entry_t queue[REPLICATION_QUEUE_MAX];
+  int queue_count;
 };
 
 #endif /* LIGHTFS_GATEWAY_REPLICATION_INTERNAL_H */

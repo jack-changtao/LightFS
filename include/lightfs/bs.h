@@ -13,7 +13,7 @@ void bs_destroy(void);
 
 typedef void (*bs_put_callback)(int result, const blob_location_t *location, void *user_data);
 int bs_put_blob(blob_id_t id, const void *data, uint32_t size,
-                bs_put_callback callback, void *user_data);
+        bs_put_callback callback, void *user_data);
 
 typedef void (*bs_get_callback)(int result, const void *data, uint32_t size, void *user_data);
 int bs_get_blob(const blob_location_t *location, bs_get_callback callback, void *user_data);

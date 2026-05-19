@@ -9,19 +9,19 @@
 typedef struct gateway gateway_t;
 
 gateway_t *gateway_create(const gateway_config_t *config,
-                           service_discovery_t *discovery,
-                           etcd_client_t *etcd);
+             service_discovery_t *discovery,
+             etcd_client_t *etcd);
 
 void gateway_destroy(gateway_t *gateway);
 
 int gateway_put_object(gateway_t *gateway, const gateway_put_request_t *request);
 
 int gateway_get_object(gateway_t *gateway,
-                        const char *bucket, const char *key,
-                        gateway_get_response_t *response);
+            const char *bucket, const char *key,
+            gateway_get_response_t *response);
 
 int gateway_delete_object(gateway_t *gateway,
-                           const char *bucket, const char *key);
+             const char *bucket, const char *key);
 
 void gateway_set_erasure_coding_policy(gateway_t *gateway, erasure_coding_policy_t policy);
 

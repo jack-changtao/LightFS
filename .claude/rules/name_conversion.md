@@ -14,6 +14,7 @@ globs: "**/*.{c,h,js,ts,jsx,tsx,py,java,go,rs,rb,php,cpp,hpp,cs,css,scss,html,vu
 - **目录命名** MUST 使用 `kebab-case`，如 `user-profile/`。
 - **测试文件** MUST 与被测文件同名，后缀为 `.test.{ext}` 或 `.spec.{ext}`。
 - **避免**使用空格或大写字母命名文件（除组件文件外）。
+- **代码缩进** 使用2个空格缩进代码。
 
 ### 变量与函数
 - **C 语言** 变量与函数 MUST 使用 `snake_case`：`user_name`、`calculate_total()`（见语言特定章节）。

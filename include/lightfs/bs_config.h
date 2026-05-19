@@ -12,12 +12,12 @@
 #define BS_SUPERBLOCK_OFFSET      0
 
 typedef struct bs_config {
-    const char *block_device_name;
-    uint64_t segment_size;
-    uint64_t journal_size;
-    uint64_t metadata_size;
-    uint32_t garbage_collection_liveness_threshold;
-    int is_read_only;
+  const char *block_device_name;
+  uint64_t segment_size;
+  uint64_t journal_size;
+  uint64_t metadata_size;
+  uint32_t garbage_collection_liveness_threshold;
+  int is_read_only;
 } bs_config_t;
 
 #endif /* LIGHTFS_BS_CONFIG_H */

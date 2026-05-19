@@ -14,59 +14,59 @@
 #define GATEWAY_MANIFEST_CACHE_SIZE 10000
 
 typedef enum {
-    ERASURE_CODING_REPLICATION_2X = 0,
-    ERASURE_CODING_REPLICATION_3X,
-    ERASURE_CODING_6_PLUS_3,
-    ERASURE_CODING_10_PLUS_4,
+  ERASURE_CODING_REPLICATION_2X = 0,
+  ERASURE_CODING_REPLICATION_3X,
+  ERASURE_CODING_6_PLUS_3,
+  ERASURE_CODING_10_PLUS_4,
 } erasure_coding_policy_t;
 
 typedef struct {
-    uint32_t fragment_index;
-    uint32_t node_id;
-    uint32_t disk_id;
-    blob_location_t location;
-    uint8_t *data;
-    uint32_t size;
+  uint32_t fragment_index;
+  uint32_t node_id;
+  uint32_t disk_id;
+  blob_location_t location;
+  uint8_t *data;
+  uint32_t size;
 } fragment_t;
 
 typedef enum {
-    DOMAIN_DATACENTER = 0,
-    DOMAIN_RACK,
-    DOMAIN_HOST,
-    DOMAIN_DISK,
+  DOMAIN_DATACENTER = 0,
+  DOMAIN_RACK,
+  DOMAIN_HOST,
+  DOMAIN_DISK,
 } placement_domain_t;
 
 typedef struct {
-    uint32_t node_id;
-    uint32_t disk_id;
-    uint32_t datacenter_id;
-    uint32_t rack_id;
-    uint32_t host_id;
-    uint64_t free_bytes;
+  uint32_t node_id;
+  uint32_t disk_id;
+  uint32_t datacenter_id;
+  uint32_t rack_id;
+  uint32_t host_id;
+  uint64_t free_bytes;
 } placement_target_t;
 
 typedef struct {
-    char bucket[META_MAX_BUCKET_LENGTH + 1];
-    char key[META_MAX_KEY_LENGTH + 1];
-    const uint8_t *data;
-    uint64_t size;
-    erasure_coding_policy_t erasure_coding_policy_override;
-    int has_erasure_coding_override;
+  char bucket[META_MAX_BUCKET_LENGTH + 1];
+  char key[META_MAX_KEY_LENGTH + 1];
+  const uint8_t *data;
+  uint64_t size;
+  erasure_coding_policy_t erasure_coding_policy_override;
+  int has_erasure_coding_override;
 } gateway_put_request_t;
 
 typedef struct {
-    uint8_t *data;
-    uint64_t size;
-    int error_code;
+  uint8_t *data;
+  uint64_t size;
+  int error_code;
 } gateway_get_response_t;
 
 typedef struct {
-    uint32_t node_id;
-    uint32_t datacenter_id;
-    uint16_t gateway_port;
-    erasure_coding_policy_t default_erasure_coding_policy;
-    int default_replication_factor;
-    uint32_t manifest_cache_size;
+  uint32_t node_id;
+  uint32_t datacenter_id;
+  uint16_t gateway_port;
+  erasure_coding_policy_t default_erasure_coding_policy;
+  int default_replication_factor;
+  uint32_t manifest_cache_size;
 } gateway_config_t;
 
 #endif /* LIGHTFS_GATEWAY_TYPES_H */

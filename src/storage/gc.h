@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 typedef struct {
-    segment_manager_t *manager;
-    uint32_t threshold;
-    uint64_t last_run;
+  segment_manager_t *manager;
+  uint32_t threshold;
+  uint64_t last_run;
 } garbage_collection_context_t;
 
 int garbage_collection_initialize(garbage_collection_context_t *context, segment_manager_t *manager);

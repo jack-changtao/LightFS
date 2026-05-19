@@ -4,14 +4,14 @@
 #include <stdint.h>
 
 typedef struct {
-    const char *listen_host;
-    uint16_t    listen_port;
-    uint32_t    max_connections;
-    uint32_t    keep_alive_timeout_ms;
-    uint32_t    request_timeout_ms;
-    uint32_t    max_request_body;
-    const char *tls_cert_path;
-    const char *tls_key_path;
+  const char *listen_host;
+  uint16_t    listen_port;
+  uint32_t    max_connections;
+  uint32_t    keep_alive_timeout_ms;
+  uint32_t    request_timeout_ms;
+  uint32_t    max_request_body;
+  const char *tls_cert_path;
+  const char *tls_key_path;
 } http_server_config_t;
 
 struct http_server;

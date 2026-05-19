@@ -11,41 +11,41 @@
 /* ── connection state ────────────────────────────────────────────── */
 
 typedef enum {
-    CONN_IDLE,        /* waiting for next request (keep-alive) */
-    CONN_READING,     /* accumulating bytes, feeding llhttp */
-    CONN_DISPATCHING, /* route → auth → handler */
-    CONN_WRITING,     /* spdk_sock_writev_async pending */
-    CONN_CLOSING,     /* write complete but not keep-alive, or error */
+  CONN_IDLE,        /* waiting for next request (keep-alive) */
+  CONN_READING,     /* accumulating bytes, feeding llhttp */
+  CONN_DISPATCHING, /* route → auth → handler */
+  CONN_WRITING,     /* spdk_sock_writev_async pending */
+  CONN_CLOSING,     /* write complete but not keep-alive, or error */
 } conn_state_t;
 
 /* ── connection ──────────────────────────────────────────────────── */
 
 typedef struct http_conn {
-    struct spdk_sock       *sock;
-    http_parser_ctx_t      parser_ctx;
-    uint8_t                *recv_buf;
-    uint32_t               recv_buf_size;
-    uint32_t               recv_len;
-    conn_state_t           state;
-    struct spdk_sock_group *group;
-    struct http_server     *server;
-    struct spdk_sock_request *write_req;
-    TAILQ_ENTRY(http_conn) link;
-    uint64_t               last_active_ts;
+  struct spdk_sock       *sock;
+  http_parser_ctx_t      parser_ctx;
+  uint8_t                *recv_buf;
+  uint32_t               recv_buf_size;
+  uint32_t               recv_len;
+  conn_state_t           state;
+  struct spdk_sock_group *group;
+  struct http_server     *server;
+  struct spdk_sock_request *write_req;
+  TAILQ_ENTRY(http_conn) link;
+  uint64_t               last_active_ts;
 } http_conn_t;
 
 /* ── server ──────────────────────────────────────────────────────── */
 
 typedef struct http_server {
-    struct spdk_sock    *listen_sock;
-    struct spdk_sock_group *group;
-    TAILQ_HEAD(, http_conn) conn_list;
-    uint32_t            conn_count;
-    uint32_t            max_connections;
-    uint32_t            keep_alive_timeout_ms;
-    uint32_t            request_timeout_ms;
-    uint32_t            max_request_body;
-    bool                running;
+  struct spdk_sock    *listen_sock;
+  struct spdk_sock_group *group;
+  TAILQ_HEAD(, http_conn) conn_list;
+  uint32_t            conn_count;
+  uint32_t            max_connections;
+  uint32_t            keep_alive_timeout_ms;
+  uint32_t            request_timeout_ms;
+  uint32_t            max_request_body;
+  bool                running;
 } http_server_t;
 
 /* ── lifecycle ───────────────────────────────────────────────────── */

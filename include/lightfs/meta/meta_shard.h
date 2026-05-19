@@ -7,27 +7,27 @@
 typedef struct meta_shard meta_shard_t;
 
 meta_shard_t *meta_shard_create(uint32_t shard_id,
-                                 uint32_t parent_shard_id,
-                                 const char *bucket_name);
+                uint32_t parent_shard_id,
+                const char *bucket_name);
 
 void meta_shard_destroy(meta_shard_t *shard);
 
 int meta_shard_insert(meta_shard_t *shard, const object_manifest_t *manifest);
 
 int meta_shard_lookup(meta_shard_t *shard,
-                       const char *bucket, const char *key,
-                       object_manifest_t *out);
+           const char *bucket, const char *key,
+           object_manifest_t *out);
 
 int meta_shard_delete(meta_shard_t *shard,
-                       const char *bucket, const char *key);
+           const char *bucket, const char *key);
 
 int meta_shard_list(meta_shard_t *shard,
-                     const char *bucket,
-                     const char *prefix,
-                     const char *marker,
-                     int max_keys,
-                     char **keys_out,
-                     int *count_out);
+          const char *bucket,
+          const char *prefix,
+          const char *marker,
+          int max_keys,
+          char **keys_out,
+          int *count_out);
 
 int meta_shard_count(meta_shard_t *shard);
 
